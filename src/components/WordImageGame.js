@@ -3,43 +3,37 @@ import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { updateProgress } from '../store/gameSlice';
 
-const colors = [
-{ name: 'Pula', value: '#FF0000' }, // Red
-{ name: 'Asul', value: '#0000FF' }, // Blue
-{ name: 'Dalag', value: '#FFFF00' }, // Yellow
-{ name: 'Berde', value: '#00FF00' }, // Green
-{ name: 'Kahel', value: '#FFA500' }, // Orange
-{ name: 'Purpura', value: '#800080' }, // Purple
-{ name: 'Itom', value: '#000000' }, // Black
-{ name: 'Puti', value: '#FFFFFF' }, // White
-{ name: 'Kape', value: '#8B4513' }, // Brown
-{ name: 'Rosas', value: '#FF69B4' }, // Pink
-{ name: 'Abo', value: '#808080' }, // Gray
+const words = [
+{ name: 'mansanas', image: '/assets/images/mansanas.png' }, // Apple
+{ name: 'silya', image: '/assets/images/silya.png' }, // Chair
+{ name: 'sakyanan', image: '/assets/images/sakyanan.png' }, // Car
+{ name: 'kahoy', image: '/assets/images/kahoy.png' }, // Tree
+{ name: 'bola', image: '/assets/images/bola.png' }, // Ball
 ];
 
-function ColorGame() {
+function WordImageGame() {
 const { difficulty, volume } = useSelector((state) => state.user);
 const dispatch = useDispatch();
 const [currentQuestion, setCurrentQuestion] = useState(0);
 const [score, setScore] = useState(0);
 const [showResult, setShowResult] = useState(false);
-const [currentColor, setCurrentColor] = useState(colors[0]);
+const [currentWord, setCurrentWord] = useState(words[0]);
 const [options, setOptions] = useState([]);
 const [buttonStates, setButtonStates] = useState(Array(4).fill('neutral')); // neutral, correct, incorrect
 const totalQuestions = 5;
 
 // Generate new question
 const generateQuestion = () => {
-    const colorIndex = Math.floor(Math.random() * colors.length);
-    const correctColor = colors[colorIndex];
-    setCurrentColor(correctColor);
+    const wordIndex = Math.floor(Math.random() * words.length);
+    const correctWord = words[wordIndex];
+    setCurrentWord(correctWord);
 
     // Generate 4 unique options, including the correct answer
-    const tempOptions = [correctColor.name];
+    const tempOptions = [correctWord];
     while (tempOptions.length < 4) {
-    const randomColor = colors[Math.floor(Math.random() * colors.length)].name;
-    if (!tempOptions.includes(randomColor)) {
-        tempOptions.push(randomColor);
+    const randomWord = words[Math.floor(Math.random() * words.length)];
+    if (!tempOptions.includes(randomWord)) {
+        tempOptions.push(randomWord);
     }
     }
     setOptions(tempOptions.sort(() => Math.random() - 0.5));
@@ -51,13 +45,13 @@ useEffect(() => {
     generateQuestion();
 }, []);
 
-const handleAnswerClick = (index, selectedColor) => {
+const handleAnswerClick = (index, selectedWord) => {
     if (buttonStates.some((state) => state !== 'neutral')) return;
 
     const newButtonStates = [...buttonStates];
     let proceedToNext = false;
 
-    if (selectedColor === currentColor.name) {
+    if (selectedWord.name === currentWord.name) {
     newButtonStates[index] = 'correct';
     setScore(score + 1);
     console.log(`Correct! Volume: ${volume}% (volume for future audio)`);
@@ -82,8 +76,8 @@ const handleAnswerClick = (index, selectedColor) => {
         setShowResult(true);
         dispatch(
             updateProgress({
-            game: 'colors',
-            score: score + (selectedColor === currentColor.name ? 1 : 0),
+            game: 'words',
+            score: score + (selectedWord.name === currentWord.name ? 1 : 0),
             completed: true,
             })
         );
@@ -125,33 +119,26 @@ return (
     </style>
     {!showResult ? (
         <>
-        <h2 className="text-2xl mb-4 text-center">Unsa nga kolor kini?</h2>
-        <div
-            className="w-32 h-32 mx-auto mb-4"
-            style={{ backgroundColor: currentColor.value }}
-        />
+        <h2 className="text-2xl mb-4 text-center">Unsa kini?</h2>
+        <div className="text-3xl font-bold text-center mb-4">{currentWord.name}</div>
         <div className="grid grid-cols-2 gap-4">
-            {options.map((colorName, index) => {
-            const colorObj = colors.find((c) => c.name === colorName);
-            const isLightColor = ['Puti', 'Dalag'].includes(colorName);
-            return (
-                <button
+            {options.map((word, index) => (
+            <button
                 key={index}
-                onClick={() => handleAnswerClick(index, colorName)}
-                className={`p-4 rounded-lg text-xl font-semibold bg-white
-                    ${buttonStates[index] === 'correct' ? 'border-4 border-green-500 animate-scale' : 
+                onClick={() => handleAnswerClick(index, word)}
+                className={`p-2 rounded-lg
+                ${buttonStates[index] === 'correct' ? 'border-4 border-green-500 animate-scale' : 
                     buttonStates[index] === 'incorrect' ? 'border-4 border-red-500 animate-shake' : 
-                    'border-4 border-gray-300'}`}
-                style={{
-                    color: difficulty === 'easy' ? colorObj.value : '#000000',
-                    textShadow: difficulty === 'easy' ? (isLightColor ? '2px 2px 2px #000000' : '1px 1px 1px #000000') : 'none',
-                }}
+                    difficulty === 'easy' && word.name === currentWord.name ? 'border-4 border-green-300' : 'border-4 border-gray-300'}`}
                 disabled={buttonStates.some((state) => state !== 'neutral') && difficulty === 'normal'}
-                >
-                {colorName}
-                </button>
-            );
-            })}
+            >
+                <img
+                src={word.image}
+                alt={word.name}
+                className="w-24 h-24 object-contain mx-auto"
+                />
+            </button>
+            ))}
         </div>
         </>
     ) : (
@@ -170,4 +157,4 @@ return (
 );
 }
 
-export default ColorGame;
+export default WordImageGame;
