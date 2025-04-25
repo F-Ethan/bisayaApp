@@ -7,12 +7,20 @@ function UserForm() {
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [learningGoals, setLearningGoals] = useState("");
+  const [difficulty, setDifficulty] = useState("easy"); // Default to easy
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    dispatch(setUserData({ name, age: parseInt(age), learningGoals }));
+    dispatch(
+      setUserData({
+        name,
+        age: parseInt(age),
+        learningGoals,
+        difficulty,
+      })
+    );
     navigate("/home");
   };
 
@@ -47,6 +55,33 @@ function UserForm() {
             className="border p-2 rounded-lg text-lg"
             required
           />
+          <div className="flex flex-col gap-2">
+            <label className="text-lg font-semibold">Game Difficulty</label>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => setDifficulty("easy")}
+                className={`px-4 py-2 rounded-lg text-xl ${
+                  difficulty === "easy"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-200"
+                }`}
+              >
+                Easy
+              </button>
+              <button
+                type="button"
+                onClick={() => setDifficulty("normal")}
+                className={`px-4 py-2 rounded-lg text-xl ${
+                  difficulty === "normal"
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200"
+                }`}
+              >
+                Normal
+              </button>
+            </div>
+          </div>
           <button
             type="submit"
             className="bg-blue-500 text-white px-4 py-2 rounded-lg text-xl hover:bg-blue-700"

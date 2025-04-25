@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { setUserData, setVolume } from "../store/userSlice";
+import { setUserData, setVolume, setCustomMaxNumber } from "../store/userSlice";
 import { useNavigate } from "react-router-dom";
 
 function Settings() {
-  const { name, age, learningGoals, volume } = useSelector(
-    (state) => state.user
-  );
+  const { name, age, learningGoals, volume, customMaxNumber, difficulty } =
+    useSelector((state) => state.user);
   const [newName, setNewName] = useState(name);
   const [newAge, setNewAge] = useState(age);
   const [newGoals, setNewGoals] = useState(learningGoals);
+  const [newMaxNumber, setNewMaxNumber] = useState(customMaxNumber || "");
+  const [newDifficulty, setNewDifficulty] = useState(difficulty);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -19,8 +20,10 @@ function Settings() {
         name: newName,
         age: parseInt(newAge),
         learningGoals: newGoals,
+        difficulty: newDifficulty,
       })
     );
+    dispatch(setCustomMaxNumber(newMaxNumber ? parseInt(newMaxNumber) : null));
     navigate("/home");
   };
 
@@ -49,6 +52,40 @@ function Settings() {
           placeholder="Learning Goals"
           className="border p-2 rounded-lg text-lg"
         />
+        <input
+          type="number"
+          value={newMaxNumber}
+          onChange={(e) => setNewMaxNumber(e.target.value)}
+          placeholder="Custom Max Number (e.g., 10, 15, 20)"
+          className="border p-2 rounded-lg text-lg"
+        />
+        <div className="flex flex-col gap-2">
+          <label className="text-lg font-semibold">Game Difficulty</label>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => setNewDifficulty("easy")}
+              className={`px-4 py-2 rounded-lg text-xl ${
+                newDifficulty === "easy"
+                  ? "bg-green-500 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Easy
+            </button>
+            <button
+              type="button"
+              onClick={() => setNewDifficulty("normal")}
+              className={`px-4 py-2 rounded-lg text-xl ${
+                newDifficulty === "normal"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200"
+              }`}
+            >
+              Normal
+            </button>
+          </div>
+        </div>
         <div>
           <label className="text-lg">Volume: {volume}%</label>
           <input
