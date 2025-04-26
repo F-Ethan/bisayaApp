@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { useState } from "react";
+import { HomeIcon, CogIcon } from "@heroicons/react/24/solid";
 import ColorGame from "./ColorGame";
 import NumbersGame from "./NumbersGame";
 import WordImageGame from "./WordImageGame";
@@ -19,6 +21,23 @@ function Learn() {
 
   return (
     <div className="container mx-auto p-4">
+      {/* Navigation Icons */}
+      <div className="flex justify-end space-x-4 mb-4">
+        <Link to="/Home">
+          <HomeIcon
+            className="h-10 w-10 text-white bg-blue-500 p-2 rounded-lg hover:bg-blue-700 transition-colors"
+            aria-label="Go to Home"
+          />
+        </Link>
+        <Link to="/settings">
+          <CogIcon
+            className="h-10 w-10 text-white bg-blue-500 p-2 rounded-lg hover:bg-blue-700 transition-colors"
+            aria-label="Go to Settings"
+          />
+        </Link>
+      </div>
+
+      {/* Game Title and Content */}
       <h1 className="text-3xl font-bold mb-4 text-center">
         Learn Bisaya - {games[currentGameIndex].name}
       </h1>
