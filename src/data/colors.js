@@ -83,12 +83,12 @@ const colors = [
       name: "bituon",
       color: "Dalag",
       value: "#FFFF00", // Yellow
-      image: require("../assets/app_emojis/shooting_star.png"),
+      image: require("../assets/app_emojis/star.png"),
       audio: null,
-      translation: "shooting star",
-      english_title: "What color is this shooting star?",
+      translation: "star",
+      english_title: "What color is this star?",
       bisaya_title: "Unsa nga kolor kini nga bituon?",
-    }, // Shooting star
+    }, // star
     {
       name: "mani",
       color: "Kape",

@@ -2,6 +2,7 @@ import { useSelector } from "react-redux";
 import { Routes, Route, Navigate } from "react-router-dom";
 import UserForm from "./components/UserForm";
 import Home from "./components/Home";
+import Play from "./components/Play";
 import Settings from "./components/Settings";
 import RelatedApps from "./components/RelatedApps";
 import Learn from "./components/Learn";
@@ -13,6 +14,7 @@ function App() {
     <Routes>
       <Route path="/" element={name ? <Navigate to="/home" /> : <UserForm />} />
       <Route path="/home" element={<Home />} />
+      <Route path="/play" element={<Play />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/related-apps" element={<RelatedApps />} />
       <Route path="/learn" element={<Learn />} />
