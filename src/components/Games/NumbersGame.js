@@ -1,298 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { updateProgress } from "../store/gameSlice";
-import usaAudio from "../assets/audio/usa.m4a";
-import duhaAudio from "../assets/audio/duha.m4a";
-import tuloAudio from "../assets/audio/tulo.m4a";
-import upatAudio from "../assets/audio/upat.m4a";
-import limaAudio from "../assets/audio/lima.m4a";
-import unomAudio from "../assets/audio/unom.m4a";
-import questionStartAudio from "../assets/audio/question_start.m4a";
-import questionEndAudio from "../assets/audio/question_end.m4a";
-
-const bisayaNumbers = [
-  "Usa",
-  "Duha",
-  "Tulo",
-  "Upat",
-  "Lima",
-  "Unom",
-  "Pito",
-  "Walo",
-  "Siyam",
-  "Napulo",
-  "Napulog usa",
-  "Napulog duha",
-  "Napulog tulo",
-  "Napulog upat",
-  "Napulog lima",
-  "Napulog unom",
-  "Napulog pito",
-  "Napulog walo",
-  "Napulog siyam",
-  "Kaluhaan",
-  "Kaluhaan og usa",
-  "Kaluhaan og duha",
-  "Kaluhaan og tulo",
-  "Kaluhaan og upat",
-  "Kaluhaan og lima",
-  "Kaluhaan og unom",
-  "Kaluhaan og pito",
-  "Kaluhaan og walo",
-  "Kaluhaan og siyam",
-  "Katloan",
-];
-
-const dotPatterns = {
-  1: [[50, 50]],
-  2: [
-    [30, 30],
-    [70, 70],
-  ],
-  3: [
-    [30, 30],
-    [50, 50],
-    [70, 70],
-  ],
-  4: [
-    [30, 30],
-    [30, 70],
-    [70, 30],
-    [70, 70],
-  ],
-  5: [
-    [30, 30],
-    [30, 70],
-    [50, 50],
-    [70, 30],
-    [70, 70],
-  ],
-  6: [
-    [30, 30],
-    [30, 50],
-    [30, 70],
-    [70, 30],
-    [70, 50],
-    [70, 70],
-  ],
-  7: [
-    [30, 30],
-    [30, 50],
-    [30, 70],
-    [50, 50],
-    [70, 30],
-    [70, 50],
-    [70, 70],
-  ],
-  8: [
-    [30, 30],
-    [30, 50],
-    [30, 70],
-    [50, 30],
-    [50, 70],
-    [70, 30],
-    [70, 50],
-    [70, 70],
-  ],
-  9: [
-    [30, 30],
-    [30, 50],
-    [30, 70],
-    [50, 30],
-    [50, 50],
-    [50, 70],
-    [70, 30],
-    [70, 50],
-    [70, 70],
-  ],
-  10: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 30],
-    [40, 70],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-  ],
-  11: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 30],
-    [40, 50],
-    [40, 70],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-  ],
-  12: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-  ],
-  13: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 30],
-    [40, 50],
-    [40, 70],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [50, 20],
-    [50, 80],
-  ],
-  14: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [50, 30],
-    [50, 70],
-  ],
-  15: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [50, 30],
-    [50, 50],
-    [50, 70],
-  ],
-  16: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [30, 30],
-    [30, 70],
-    [70, 30],
-    [70, 70],
-  ],
-  17: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [30, 30],
-    [30, 70],
-    [70, 30],
-    [70, 70],
-    [50, 50],
-  ],
-  18: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [30, 30],
-    [30, 50],
-    [30, 70],
-    [70, 30],
-    [70, 50],
-    [70, 70],
-  ],
-  19: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [30, 30],
-    [30, 50],
-    [30, 70],
-    [70, 30],
-    [70, 50],
-    [70, 70],
-    [50, 50],
-  ],
-  20: [
-    [20, 20],
-    [20, 40],
-    [20, 60],
-    [20, 80],
-    [40, 20],
-    [40, 40],
-    [40, 60],
-    [40, 80],
-    [60, 20],
-    [60, 40],
-    [60, 60],
-    [60, 80],
-    [30, 30],
-    [30, 50],
-    [30, 70],
-    [70, 30],
-    [70, 50],
-    [70, 70],
-    [50, 30],
-    [50, 70],
-  ],
-};
+import { updateProgress } from "../../store/gameSlice";
+import questionStartAudio from "../../assets/audio/question_start.m4a";
+import questionEndAudio from "../../assets/audio/question_end.m4a";
+import { bisayaNumbers, dotPatterns, numberAudio } from "../../data/numbers";
 
 function NumbersGame({ onQuestionAnswered }) {
   const { age, volume, difficulty, customMaxNumber } = useSelector(
@@ -310,17 +21,6 @@ function NumbersGame({ onQuestionAnswered }) {
   const maxNumber = customMaxNumber || (age <= 3 ? 10 : age === 4 ? 20 : 30);
   const totalQuestions = 5;
   const currentAudioRef = useRef(null); // Track current audio
-
-  // Audio mapping for numbers
-  const numberAudio = {
-    1: usaAudio,
-    2: duhaAudio,
-    3: tuloAudio,
-    4: upatAudio,
-    5: limaAudio,
-    6: unomAudio,
-    // Add more when available, e.g., 7: pitoAudio
-  };
 
   // Play audio with volume control, stopping any current audio
   const playAudio = (audioFile) => {
@@ -383,17 +83,17 @@ function NumbersGame({ onQuestionAnswered }) {
 
   const handleCardClick = (index, selectedNumber) => {
     if (cardStates[index].flipped) return;
-  
+
     const newCardStates = [...cardStates];
     let proceedToNext = false;
-  
+
     // Play number audio on click
     if (numberAudio[selectedNumber]) {
       playAudio(numberAudio[selectedNumber]);
     } else {
       console.log(`No audio for number ${selectedNumber} yet`);
     }
-  
+
     if (selectedNumber === currentNumber) {
       newCardStates[index] = { state: "correct", flipped: true };
       setScore(score + 1);
@@ -407,18 +107,18 @@ function NumbersGame({ onQuestionAnswered }) {
       newCardStates[index] = { state: "incorrect", flipped: true }; // Flip to show feedback
       console.log(`Try again! Volume: ${volume}%`);
     }
-  
+
     setCardStates(newCardStates);
-  
+
     if (proceedToNext) {
       setTimeout(() => {
         // Reset card states to neutral before proceeding
         setCardStates(newCardStates.map(() => ({ state: "neutral", flipped: false })));
-  
+
         if (typeof onQuestionAnswered === "function") {
           onQuestionAnswered(); // Call after delay to ensure effects are visible
         }
-  
+
         if (currentQuestion < totalQuestions - 1) {
           setCurrentQuestion(currentQuestion + 1);
           generateQuestion();

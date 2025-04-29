@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { updateProgress } from "../store/gameSlice";
-import colors from "../data/colors";
+import { updateProgress } from "../../store/gameSlice";
+import colors from "../../data/colors";
 
 function ColorGame({ onQuestionAnswered }) {
   const { difficulty, volume } = useSelector((state) => state.user);

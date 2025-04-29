@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { updateProgress } from "../store/gameSlice";
-import words from "../data/words";
+import { updateProgress } from "../../store/gameSlice";
+import words from "../../data/words";
 
 function WordImageGame({ onQuestionAnswered }) {
   const { difficulty, volume, name } = useSelector((state) => state.user);
@@ -140,7 +140,10 @@ function WordImageGame({ onQuestionAnswered }) {
       setTimeout(() => {
         // Reset button states to neutral before proceeding
         setButtonStates(newButtonStates.map(() => "neutral"));
-  
+        
+        if (typeof onQuestionAnswered === 'function') {
+          onQuestionAnswered(); // Only call if it's a function
+        }
         if (typeof onQuestionAnswered === "function") {
           onQuestionAnswered(); // Call after delay to ensure effects are visible
         }
@@ -177,9 +180,8 @@ function WordImageGame({ onQuestionAnswered }) {
   };
 
   const handleTitleClick = () => {
-    if (typeof onQuestionAnswered === 'function') {
-      onQuestionAnswered(); // Only call if it's a function
-    }
+    console.log("Title clicked, showEnglishSentence:", showEnglishSentence);
+    setShowEnglishSentence(!showEnglishSentence);
     if (!usedHint) {
       setUsedHint(true);
       dispatch(

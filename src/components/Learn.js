@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { HomeIcon, CogIcon } from "@heroicons/react/24/solid";
-import ColorGame from "./ColorGame";
-import NumbersGame from "./NumbersGame";
-import WordImageGame from "./WordImageGame";
+import ColorGame from "./Games/ColorGame";
+import NumbersGame from "./Games/NumbersGame";
+import WordImageGame from "./Games/WordImageGame";
 
 function Learn() {
   const [currentGameIndex, setCurrentGameIndex] = useState(0);
@@ -15,6 +15,12 @@ function Learn() {
 
   const handleNextGame = () => {
     setCurrentGameIndex((prevIndex) => (prevIndex + 1) % games.length);
+  };
+
+  const handlePreviousGame = () => {
+    setCurrentGameIndex(
+      (prevIndex) => (prevIndex - 1 + games.length) % games.length
+    );
   };
 
   const CurrentGame = games[currentGameIndex].component;
@@ -38,16 +44,20 @@ function Learn() {
       </div>
 
       {/* Game Title and Content */}
-      <h1 className="text-3xl font-bold mb-4 text-center">
-        Learn Bisaya - {games[currentGameIndex].name}
-      </h1>
+
       <CurrentGame />
-      <div className="text-center mt-6">
+      <div className="flex justify-between items-center mt-6 px-4">
         <button
-          className="bg-blue-500 text-white px-4 py-2 rounded-lg text-xl hover:bg-blue-700"
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg text-xl hover:bg-blue-700 flex items-center gap-2"
+          onClick={handlePreviousGame}
+        >
+          <span>←</span> Previous Game
+        </button>
+        <button
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg text-xl hover:bg-blue-700 flex items-center gap-2"
           onClick={handleNextGame}
         >
-          Next Game
+          Next Game <span>→</span>
         </button>
       </div>
     </div>

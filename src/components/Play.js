@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { HomeIcon, CogIcon } from "@heroicons/react/24/solid";
-import ColorGame from "./ColorGame";
-import NumbersGame from "./NumbersGame";
-import WordImageGame from "./WordImageGame";
+import ColorGame from "./Games/ColorGame";
+import NumbersGame from "./Games/NumbersGame";
+import WordImageGame from "./Games/WordImageGame";
 
 function Play() {
   const [currentGameIndex, setCurrentGameIndex] = useState(Math.floor(Math.random() * 3));
@@ -48,7 +48,9 @@ function Play() {
       </div>
 
       {/* Game Title and Content */}
-     
+      <h1 className="text-3xl font-bold mb-4 text-center">
+        Learn Bisaya - {games[currentGameIndex].name}
+      </h1>
       <CurrentGame onQuestionAnswered={handleQuestionAnswered} />
     </div>
   );
