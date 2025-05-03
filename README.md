@@ -55,6 +55,10 @@ Testing Libraries: @testing-library/react (v16.3.0), @testing-library/jest-dom (
 Web Vitals: Performance monitoring with web-vitals (v2.1.4).
 Assets: ~200 Google Emoji PNGs sourced from Google Noto Emoji.
 
+Emoji images provided by Google Noto Emoji, licensed under the Apache License 2.0.
+Copyright © Google Inc. All Rights Reserved.
+Source: https://github.com/googlefonts/noto-emoji
+
 Contributing
 Contributions are welcome! To contribute:
 

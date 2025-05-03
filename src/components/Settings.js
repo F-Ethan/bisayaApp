@@ -11,6 +11,7 @@ function Settings() {
   const [newGoals, setNewGoals] = useState(learningGoals);
   const [newMaxNumber, setNewMaxNumber] = useState(customMaxNumber || "");
   const [newDifficulty, setNewDifficulty] = useState(difficulty);
+  const [showLicense, setShowLicense] = useState(false); // State for license modal
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -26,6 +27,26 @@ function Settings() {
     dispatch(setCustomMaxNumber(newMaxNumber ? parseInt(newMaxNumber) : null));
     navigate("/home");
   };
+
+  // Apache License 2.0 text (abridged for brevity; include full text in practice)
+  const apacheLicense = `
+Apache License, Version 2.0
+Copyright © Google Inc. All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+[Full text available at: http://www.apache.org/licenses/LICENSE-2.0]
+`;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-blue-100">
@@ -97,6 +118,20 @@ function Settings() {
             className="w-full"
           />
         </div>
+        {/* Attribution Section */}
+        <div className="flex flex-col gap-2">
+          <label className="text-lg font-semibold">Credits</label>
+          <p className="text-sm text-gray-600">
+            Emoji images provided by Google Noto Emoji, licensed under the Apache
+            License 2.0. Copyright © Google Inc. All Rights Reserved.
+          </p>
+          <button
+            onClick={() => setShowLicense(true)}
+            className="text-blue-500 text-sm underline hover:text-blue-700"
+          >
+            View License
+          </button>
+        </div>
         <button
           onClick={handleSave}
           className="bg-blue-500 text-white px-4 py-2 rounded-lg text-xl hover:bg-blue-700"
@@ -104,6 +139,26 @@ function Settings() {
           Save
         </button>
       </div>
+
+      {/* License Modal */}
+      {showLicense && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg max-h-[80vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-purple-600 mb-4">
+              Apache License 2.0
+            </h2>
+            <pre className="text-sm text-gray-600 whitespace-pre-wrap">
+              {apacheLicense}
+            </pre>
+            <button
+              onClick={() => setShowLicense(false)}
+              className="mt-4 bg-blue-500 text-white px-4 py-2 rounded-lg text-lg hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

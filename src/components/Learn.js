@@ -4,6 +4,7 @@ import { HomeIcon, CogIcon } from "@heroicons/react/24/solid";
 import ColorGame from "./Games/ColorGame";
 import NumbersGame from "./Games/NumbersGame";
 import WordImageGame from "./Games/WordImageGame";
+import BookGame from "./Games/BookGame";
 
 function Learn() {
   const [currentGameIndex, setCurrentGameIndex] = useState(0);
@@ -11,6 +12,7 @@ function Learn() {
     { component: ColorGame, name: "Colors" },
     { component: NumbersGame, name: "Numbers" },
     { component: WordImageGame, name: "Words" },
+    { component: BookGame, name: "Books" },
   ];
 
   const handleNextGame = () => {
