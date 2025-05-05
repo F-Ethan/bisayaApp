@@ -129,7 +129,7 @@ function NumbersGame({ onQuestionAnswered }) {
             })
           );
         }
-      }, 1000);
+      }, 2000);
     }
   };
 

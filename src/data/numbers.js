@@ -10,7 +10,7 @@ export const bisayaNumbers = [
     number: 2,
     english: "Two",
     bisaya: "Duha",
-    audio_path: require("../assets/audio/numbers/2_bis.m4a"),
+    audio_path: require("../assets/audio/numbers/2_two.m4a"),
     english_audio_path: require("../assets/audio/numbers/2_en.m4a")
   },
   {
