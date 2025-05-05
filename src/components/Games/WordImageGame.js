@@ -10,31 +10,15 @@ function WordImageGame({ onQuestionAnswered }) {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [localScore, setLocalScore] = useState(score);
   const [showResult, setShowResult] = useState(false);
-  const [currentWord, setCurrentWord] = useState(
-    words[0]
-      ? {
-          name: words[0].name_in_bisaya || "Loading...",
-          translation: words[0].image_name || "",
-          image: words[0].filename_path || "/assets/placeholder.png",
-          bisaya_sentence: words[0].sentence_in_bisaya || "",
-          english_sentence: words[0].sentence || "",
-        }
-      : {
-          name: "Loading...",
-          translation: "",
-          image: "/assets/placeholder.png",
-          bisaya_sentence: "",
-          english_sentence: "",
-        }
-  );
+  const [currentWord, setCurrentWord] = useState(null);
   const [options, setOptions] = useState([]);
   const [buttonStates, setButtonStates] = useState(Array(4).fill("neutral"));
   const [showHint, setShowHint] = useState(false);
   const [usedHint, setUsedHint] = useState(false);
   const [showEnglishSentence, setShowEnglishSentence] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [filteredWords, setFilteredWords] = useState([]);
   const totalQuestions = 5;
-  const maxWords = words.length || 193;
 
   const fallbackWord = {
     name: "Fallback",
@@ -42,219 +26,161 @@ function WordImageGame({ onQuestionAnswered }) {
     image: "/assets/placeholder.png",
     bisaya_sentence: "This is a fallback word.",
     english_sentence: "This is a fallback word.",
+    difficulty: 1,
   };
 
+  // Initialize filtered words based on maxDifficulty
   useEffect(() => {
-    console.log("Words array length:", words.length);
-    console.log("Initial currentWord:", currentWord);
-    console.log("MaxDifficulty:", maxDifficulty);
-    console.log("Sample filename_path:", words[0]?.filename_path);
-  }, [currentWord, maxDifficulty]);
+    console.log("Words array:", words);
+    console.log("User difficulty (initial):", difficulty);
+    console.log("Current maxDifficulty:", maxDifficulty);
+    if (!words || !Array.isArray(words) || words.length === 0) {
+      console.error("Words array is empty, undefined, or not an array");
+      setFilteredWords([fallbackWord]);
+      return;
+    }
+
+    const maxDifficultyForUser = parseInt(maxDifficulty, 10) || 1; // Default to 1 if maxDifficulty is invalid
+    console.log(`Filtering words for difficulty 1-${maxDifficultyForUser}`);
+
+    // First attempt: strict image validation
+    let validWords = words
+      .filter((word) => {
+        const wordDifficulty = parseInt(word.difficulty, 10);
+        const isValidDifficulty = !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
+        const resolvedImage = typeof word.filename_path === "string"
+          ? word.filename_path
+          : word.filename_path?.default || "/assets/placeholder.png";
+        const isValidImage = resolvedImage &&
+          typeof resolvedImage === "string" &&
+          !resolvedImage.startsWith("data:image");
+        console.log(`Word: ${word.name_in_bisaya}, Difficulty: ${wordDifficulty}, Image: ${resolvedImage}, Valid: ${isValidDifficulty && isValidImage}`);
+        return isValidDifficulty && isValidImage;
+      })
+      .map((word) => ({
+        name: word.name_in_bisaya || "Unknown",
+        translation: word.image_name || "",
+        image: typeof word.filename_path === "string"
+          ? word.filename_path
+          : word.filename_path?.default || "/assets/placeholder.png",
+        bisaya_sentence: word.sentence_in_bisaya || "",
+        english_sentence: word.sentence || "",
+        difficulty: parseInt(word.difficulty, 10),
+      }));
+
+    // If no words pass strict image validation, relax image check
+    if (validWords.length === 0) {
+      console.warn("No words passed strict image validation, relaxing image check");
+      validWords = words
+        .filter((word) => {
+          const wordDifficulty = parseInt(word.difficulty, 10);
+          const isValidDifficulty = !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
+          const resolvedImage = typeof word.filename_path === "string"
+            ? word.filename_path
+            : word.filename_path?.default || "/assets/placeholder.png";
+          console.log(`Relaxed check - Word: ${word.name_in_bisaya}, Difficulty: ${wordDifficulty}, Image: ${resolvedImage}`);
+          return isValidDifficulty;
+        })
+        .map((word) => ({
+          name: word.name_in_bisaya || "Unknown",
+          translation: word.image_name || "",
+          image: typeof word.filename_path === "string"
+            ? word.filename_path
+            : word.filename_path?.default || "/assets/placeholder.png",
+          bisaya_sentence: word.sentence_in_bisaya || "",
+          english_sentence: word.sentence || "",
+          difficulty: parseInt(word.difficulty, 10),
+        }));
+    }
+
+    console.log(`Filtered words count (difficulty 1-${maxDifficultyForUser}): ${validWords.length}`);
+    console.log("Filtered words:", validWords);
+    setFilteredWords(validWords.length > 0 ? validWords : [fallbackWord]);
+  }, [maxDifficulty]);
 
   const generateQuestion = useCallback(() => {
-    if (!words || words.length === 0) {
-      console.error("Words array is empty or undefined");
+    if (filteredWords.length === 0) {
+      console.error("No filtered words available");
       setCurrentWord(fallbackWord);
       setOptions([fallbackWord]);
       return;
     }
 
-    const filteredWords = [];
-    const activeWords = words
-      .filter((word) => {
-        const wordDifficulty = parseInt(word.difficulty, 10);
-        const isValidDifficulty = !isNaN(wordDifficulty) && wordDifficulty <= maxDifficulty;
-        let resolvedImage = word.filename_path;
-        try {
-          resolvedImage = typeof word.filename_path === "string" ? word.filename_path : word.filename_path.default || "/assets/placeholder.png";
-        } catch (e) {
-          console.warn(`Failed to resolve filename_path for ${word.name_in_bisaya}:`, e);
-          resolvedImage = "/assets/placeholder.png";
-        }
-        const isValidImage =
-          resolvedImage &&
-          typeof resolvedImage === "string" &&
-          !resolvedImage.startsWith("data:image") &&
-          resolvedImage !== "/assets/placeholder.png";
-        const isValid = isValidDifficulty && isValidImage;
-        if (!isValid) {
-          filteredWords.push({
-            name: word.name_in_bisaya,
-            difficulty: word.difficulty,
-            isValidDifficulty,
-            filename_path: resolvedImage,
-            isValidImage,
-          });
-        }
-        return isValid;
-      });
+    const wordIndex = Math.floor(Math.random() * filteredWords.length);
+    const correctWord = filteredWords[wordIndex] || fallbackWord;
+    setCurrentWord(correctWord);
+    console.log("Generated currentWord:", correctWord);
 
-    if (filteredWords.length > 0) {
-      console.warn("Filtered out words:", filteredWords);
+    const tempOptions = [correctWord];
+    const availableWords = filteredWords.filter((w) => w.name !== correctWord.name);
+    while (tempOptions.length < 4 && availableWords.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availableWords.length);
+      tempOptions.push(availableWords[randomIndex]);
+      availableWords.splice(randomIndex, 1);
     }
-    console.log(`Active words count for difficulty <= ${maxDifficulty}:`, activeWords.length);
-
-    if (activeWords.length === 0) {
-      console.error(`No valid words found for difficulty <= ${maxDifficulty}. Falling back to any valid image.`);
-      const fallbackActiveWords = words
-        .filter((word) => {
-          let resolvedImage = word.filename_path;
-          try {
-            resolvedImage = typeof word.filename_path === "string" ? word.filename_path : word.filename_path.default || "/assets/placeholder.png";
-          } catch (e) {
-            resolvedImage = "/assets/placeholder.png";
-          }
-          return resolvedImage && typeof resolvedImage === "string" && !resolvedImage.startsWith("data:image");
-        });
-      if (fallbackActiveWords.length === 0) {
-        console.error("No words with valid images found. Using fallback word.");
-        setCurrentWord(fallbackWord);
-        setOptions([fallbackWord]);
-        dispatch(
-          updateProgress({
-            game: "words",
-            score: localScore,
-            completed: false,
-            streak: 0,
-            maxDifficulty: 1,
-          })
-        );
-        return;
-      }
-      const wordIndex = Math.floor(Math.random() * fallbackActiveWords.length);
-      const correctWord = fallbackActiveWords[wordIndex] || fallbackWord;
-      const mappedCorrectWord = {
-        name: correctWord.name_in_bisaya || "Fallback",
-        translation: correctWord.image_name || "",
-        image: correctWord.filename_path || "/assets/placeholder.png",
-        bisaya_sentence: correctWord.sentence_in_bisaya || "",
-        english_sentence: correctWord.sentence || "",
-      };
-      setCurrentWord(mappedCorrectWord);
-      console.log("Generated fallback currentWord:", mappedCorrectWord);
-      const tempOptions = [mappedCorrectWord];
-      const availableWords = fallbackActiveWords.filter((w) => w.name_in_bisaya !== correctWord.name_in_bisaya);
-      while (tempOptions.length < 4 && availableWords.length > 0) {
-        const randomIndex = Math.floor(Math.random() * availableWords.length);
-        const option = availableWords[randomIndex];
-        tempOptions.push({
-          name: option.name_in_bisaya || "Option",
-          translation: option.image_name || "",
-          image: option.filename_path || "/assets/placeholder.png",
-          bisaya_sentence: option.sentence_in_bisaya || "",
-          english_sentence: option.sentence || "",
-        });
-        availableWords.splice(randomIndex, 1);
-      }
-      while (tempOptions.length < 4) {
-        tempOptions.push(fallbackWord);
-      }
-      setOptions(tempOptions.sort(() => Math.random() - 0.5));
-    } else {
-      const wordIndex = Math.floor(Math.random() * activeWords.length);
-      const correctWord = activeWords[wordIndex] || fallbackWord;
-      const mappedCorrectWord = {
-        name: correctWord.name_in_bisaya || "Fallback",
-        translation: correctWord.image_name || "",
-        image: correctWord.filename_path || "/assets/placeholder.png",
-        bisaya_sentence: correctWord.sentence_in_bisaya || "",
-        english_sentence: correctWord.sentence || "",
-      };
-      setCurrentWord(mappedCorrectWord);
-      console.log("Generated currentWord:", mappedCorrectWord);
-
-      const tempOptions = [mappedCorrectWord];
-      const availableWords = activeWords.filter((w) => w.name_in_bisaya !== correctWord.name_in_bisaya);
-      while (tempOptions.length < 4 && availableWords.length > 0) {
-        const randomIndex = Math.floor(Math.random() * availableWords.length);
-        const option = availableWords[randomIndex];
-        tempOptions.push({
-          name: option.name_in_bisaya || "Option",
-          translation: option.image_name || "",
-          image: option.filename_path || "/assets/placeholder.png",
-          bisaya_sentence: option.sentence_in_bisaya || "",
-          english_sentence: option.sentence || "",
-        });
-        availableWords.splice(randomIndex, 1);
-      }
-      while (tempOptions.length < 4) {
-        tempOptions.push(fallbackWord);
-      }
-      setOptions(tempOptions.sort(() => Math.random() - 0.5));
+    while (tempOptions.length < 4) {
+      tempOptions.push(fallbackWord);
     }
-
+    setOptions(tempOptions.sort(() => Math.random() - 0.5));
     setButtonStates(Array(4).fill("neutral"));
     setShowHint(false);
     setUsedHint(false);
     setShowEnglishSentence(false);
     setIsProcessing(false);
-  }, [maxDifficulty, dispatch, localScore, maxWords]);
+  }, [filteredWords]);
 
   useEffect(() => {
-    generateQuestion();
-  }, [generateQuestion, maxDifficulty]);
+    if (filteredWords.length > 0) {
+      generateQuestion();
+    }
+  }, [generateQuestion, filteredWords]);
 
   const handleAnswerClick = (index, selectedWord, event) => {
     event.preventDefault();
     if (isProcessing || buttonStates.some((state) => state !== "neutral")) {
-      console.log("Click ignored: isProcessing or buttons not neutral");
       return;
     }
 
-    console.log(`handleAnswerClick triggered: index=${index}, word=${selectedWord.name}`);
-
     setIsProcessing(true);
-    const newButtonStates = [...buttonStates];
+    const newButtonStates = Array(4).fill("neutral");
+    newButtonStates[index] = selectedWord.name === currentWord.name ? "correct" : "incorrect";
+    setButtonStates(newButtonStates);
 
     if (selectedWord.name === currentWord.name) {
-      newButtonStates[index] = "correct";
       const newScore = localScore + 1;
       setLocalScore(newScore);
       if (!usedHint) {
         const newStreak = streak + 1;
         let newMaxDifficulty = maxDifficulty;
         if (newStreak >= 10) {
-          newMaxDifficulty = maxDifficulty + 1;
-          alert(
-            `Great job${name ? ", " + name : ""}! You reached a streak of 10 and unlocked level ${newMaxDifficulty}!`
-          );
-          dispatch(
-            updateProgress({
-              game: "words",
-              score: newScore,
-              completed: false,
-              streak: 0,
-              maxDifficulty: newMaxDifficulty,
-            })
-          );
+          newMaxDifficulty = maxDifficulty + 1; // Increment maxDifficulty
+          alert(`Great job${name ? ", " + name : ""}! You reached a streak of 10 and unlocked level ${newMaxDifficulty}!`);
+          dispatch(updateProgress({
+            game: "words",
+            score: newScore,
+            completed: false,
+            streak: 0, // Reset streak after reaching 10
+            maxDifficulty: newMaxDifficulty,
+          }));
         } else {
-          dispatch(
-            updateProgress({
-              game: "words",
-              score: newScore,
-              completed: false,
-              streak: newStreak,
-              maxDifficulty: newMaxDifficulty,
-            })
-          );
+          dispatch(updateProgress({
+            game: "words",
+            score: newScore,
+            completed: false,
+            streak: newStreak,
+            maxDifficulty: newMaxDifficulty,
+          }));
         }
       }
-      console.log(`Correct! Volume: ${volume}% (volume for future audio)`);
     } else {
-      newButtonStates[index] = "incorrect";
-      dispatch(
-        updateProgress({
-          game: "words",
-          score: localScore,
-          completed: false,
-          streak: 0,
-          maxDifficulty: maxDifficulty,
-        })
-      );
-      console.log(difficulty === "normal" ? `Incorrect!` : `Try again! Volume: ${volume}% (volume for future audio)`);
+      dispatch(updateProgress({
+        game: "words",
+        score: localScore,
+        completed: false,
+        streak: 0,
+        maxDifficulty: maxDifficulty,
+      }));
     }
-
-    setButtonStates(newButtonStates);
 
     setTimeout(() => {
       setButtonStates(Array(4).fill("neutral"));
@@ -266,48 +192,42 @@ function WordImageGame({ onQuestionAnswered }) {
         generateQuestion();
       } else {
         setShowResult(true);
-        dispatch(
-          updateProgress({
-            game: "words",
-            score: localScore,
-            completed: true,
-            maxDifficulty: maxDifficulty,
-          })
-        );
+        dispatch(updateProgress({
+          game: "words",
+          score: localScore,
+          completed: true,
+          maxDifficulty: maxDifficulty,
+        }));
       }
-    }, 1000);
+      setIsProcessing(false);
+    }, 800);
   };
 
   const handleHintClick = () => {
     if (isProcessing) return;
     setShowHint(!showHint);
     setUsedHint(true);
-    dispatch(
-      updateProgress({
+    dispatch(updateProgress({
+      game: "words",
+      score: localScore,
+      completed: false,
+      streak: 0,
+      maxDifficulty: maxDifficulty,
+    }));
+  };
+
+  const handleTitleClick = () => {
+    if (isProcessing) return;
+    setShowEnglishSentence(!showEnglishSentence);
+    if (!usedHint) {
+      setUsedHint(true);
+      dispatch(updateProgress({
         game: "words",
         score: localScore,
         completed: false,
         streak: 0,
         maxDifficulty: maxDifficulty,
-      })
-    );
-  };
-
-  const handleTitleClick = () => {
-    if (isProcessing) return;
-    console.log("Title clicked, showEnglishSentence:", showEnglishSentence);
-    setShowEnglishSentence(!showEnglishSentence);
-    if (!usedHint) {
-      setUsedHint(true);
-      dispatch(
-        updateProgress({
-          game: "words",
-          score: localScore,
-          completed: false,
-          streak: 0,
-          maxDifficulty: maxDifficulty,
-        })
-      );
+      }));
     }
   };
 
@@ -315,14 +235,12 @@ function WordImageGame({ onQuestionAnswered }) {
     setCurrentQuestion(0);
     setLocalScore(0);
     setShowResult(false);
-    dispatch(
-      updateProgress({
-        game: "words",
-        score: 0,
-        completed: false,
-        maxDifficulty: maxDifficulty,
-      })
-    );
+    dispatch(updateProgress({
+      game: "words",
+      score: 0,
+      completed: false,
+      maxDifficulty: maxDifficulty,
+    }));
     generateQuestion();
   };
 
@@ -343,7 +261,7 @@ function WordImageGame({ onQuestionAnswered }) {
           }
           @keyframes scale {
             0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
+            50% { transform: scale(1.05); }
             100% { transform: scale(1); }
           }
           @keyframes fadeIn {
@@ -370,6 +288,16 @@ function WordImageGame({ onQuestionAnswered }) {
           }
           .disabled-button {
             touch-action: none;
+            opacity: 0.7;
+            cursor: not-allowed;
+          }
+          .card-correct {
+            border-color: #22c55e !important;
+            animation: scale 0.3s ease-in-out;
+          }
+          .card-incorrect {
+            border-color: #ef4444 !important;
+            animation: shake 0.3s ease-in-out;
           }
         `}
       </style>
@@ -389,7 +317,7 @@ function WordImageGame({ onQuestionAnswered }) {
           <div className="text-3xl font-bold text-center mb-2">{currentWord.name || "Loading..."}</div>
           <div className="text-center mb-4">
             <button
-              className="bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-700"
+              className="bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               onClick={handleHintClick}
               disabled={isProcessing}
             >
@@ -406,15 +334,12 @@ function WordImageGame({ onQuestionAnswered }) {
               <button
                 key={index}
                 onClick={(e) => handleAnswerClick(index, option, e)}
-                className={`p-2 rounded-lg ${isProcessing ? "disabled-button" : ""} ${
-                  buttonStates[index] === "correct"
-                    ? "border-4 border-green-500 animate-scale"
-                    : buttonStates[index] === "incorrect"
-                    ? "border-4 border-red-500 animate-shake"
-                    : difficulty === "easy" && option.name === currentWord.name
-                    ? "border-4 border-green-300"
-                    : "border-4 border-gray-300"
-                }`}
+                className={`p-2 rounded-lg border-4 transition-all duration-200
+                  ${isProcessing ? "disabled-button" : ""}
+                  ${buttonStates[index] === "correct" ? "card-correct" : ""}
+                  ${buttonStates[index] === "incorrect" ? "card-incorrect" : ""}
+                  ${difficulty === "easy" && option.name === currentWord.name && buttonStates[index] === "neutral" ? "border-green-300" : "border-gray-300"}
+                `}
                 disabled={isProcessing || buttonStates.some((state) => state !== "neutral")}
               >
                 <img
@@ -422,7 +347,7 @@ function WordImageGame({ onQuestionAnswered }) {
                   alt={option.name || "Option"}
                   className="w-24 h-24 object-contain mx-auto"
                   onError={(e) => {
-                    console.error(`Failed to load image for ${option.name}:`, option.image, option);
+                    console.error(`Failed to load image for ${option.name}:`, option.image);
                     e.target.src = "/assets/placeholder.png";
                   }}
                 />

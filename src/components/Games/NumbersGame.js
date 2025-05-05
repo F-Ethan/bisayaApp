@@ -1,15 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { updateProgress } from "../../store/gameSlice";
-import { bisayaNumbers, dotPatterns } from "../../data/numbers";
-import usaAudio from "../../assets/audio/usa.m4a";
-import duhaAudio from "../../assets/audio/duha.m4a";
-import tuloAudio from "../../assets/audio/tulo.m4a";
-import upatAudio from "../../assets/audio/upat.m4a";
-import limaAudio from "../../assets/audio/lima.m4a";
-import unomAudio from "../../assets/audio/unom.m4a";
-import questionStartAudio from "../../assets/audio/question_start.m4a";
-import questionEndAudio from "../../assets/audio/question_end.m4a";
+import { bisayaNumbers, bisayaNumbersTitles, dotPatterns } from "../../data/numbers";
 
 function NumbersGame({ onQuestionAnswered }) {
   const { age, volume, difficulty, customMaxNumber } = useSelector(
@@ -28,16 +20,7 @@ function NumbersGame({ onQuestionAnswered }) {
   const isTransitioningRef = useRef(false);
   const maxNumber = customMaxNumber || (age <= 3 ? 10 : age === 4 ? 20 : 30);
   const totalQuestions = 5;
-  const isSingleQuestionMode = typeof onQuestionAnswered === "function"; // Determine mode
-
-  const numberAudio = {
-    1: usaAudio,
-    2: duhaAudio,
-    3: tuloAudio,
-    4: upatAudio,
-    5: limaAudio,
-    6: unomAudio,
-  };
+  const isSingleQuestionMode = typeof onQuestionAnswered === "function";
 
   const playAudio = (audioFile) => {
     return new Promise((resolve) => {
@@ -64,22 +47,21 @@ function NumbersGame({ onQuestionAnswered }) {
 
   const playQuestionAudio = async (number) => {
     if (isTransitioningRef.current) return;
-    await playAudio(questionStartAudio);
-    if (numberAudio[number]) {
-      await playAudio(numberAudio[number]);
+    const questionData = bisayaNumbersTitles.find((item) => item.number === number);
+    if (questionData && questionData.audio_path) {
+      await playAudio(questionData.audio_path);
     } else {
-      console.log(`No number audio for ${number}`);
+      console.log(`No question audio for number ${number}`);
     }
-    await playAudio(questionEndAudio);
   };
 
   const generateQuestion = () => {
     if (isTransitioningRef.current) return;
-    const number = Math.floor(Math.random() * maxNumber) + 1;
+    const number = Math.floor(Math.random() * Math.min(maxNumber, 20)) + 1; // Limit to 20 as per bisayaNumbersTitles
     setCurrentNumber(number);
     const tempOptions = [number];
     while (tempOptions.length < 4) {
-      const randomNum = Math.floor(Math.random() * maxNumber) + 1;
+      const randomNum = Math.floor(Math.random() * Math.min(maxNumber, 20)) + 1;
       if (!tempOptions.includes(randomNum)) {
         tempOptions.push(randomNum);
       }
@@ -100,10 +82,11 @@ function NumbersGame({ onQuestionAnswered }) {
     const newCardStates = [...cardStates];
     let proceedToNext = false;
 
-    if (numberAudio[selectedNumber]) {
-      playAudio(numberAudio[selectedNumber]);
+    const numberData = bisayaNumbers.find((item) => item.number === selectedNumber);
+    if (numberData && numberData.audio_path) {
+      playAudio(numberData.audio_path);
     } else {
-      console.log(`No audio for number ${selectedNumber} yet`);
+      console.log(`No audio for number ${selectedNumber}`);
     }
 
     if (selectedNumber === currentNumber) {
@@ -127,7 +110,6 @@ function NumbersGame({ onQuestionAnswered }) {
         setCardStates(newCardStates.map(() => ({ state: "neutral", flipped: false })));
 
         if (isSingleQuestionMode) {
-          // Single-question mode: Call onQuestionAnswered and stop
           isTransitioningRef.current = true;
           if (currentAudioRef.current) {
             currentAudioRef.current.pause();
@@ -135,11 +117,9 @@ function NumbersGame({ onQuestionAnswered }) {
           }
           onQuestionAnswered();
         } else if (currentQuestion < totalQuestions - 1) {
-          // Multi-question mode: Proceed to next question
           setCurrentQuestion(currentQuestion + 1);
           generateQuestion();
         } else {
-          // Multi-question mode: Show end screen
           setShowResult(true);
           dispatch(
             updateProgress({
@@ -171,11 +151,7 @@ function NumbersGame({ onQuestionAnswered }) {
               className="inline-flex items-center justify-center hover:text-gray-700 focus:outline-none cursor-pointer"
               aria-label="Replay question audio"
             >
-              Unsang kard ang adunay{" "}
-              <span className="text-3xl text-blue-500 font-bold mx-1">
-                {bisayaNumbers[currentNumber - 1]}
-              </span>{" "}
-              ka tuldok?
+              {bisayaNumbersTitles.find((item) => item.number === currentNumber)?.bisaya || ""}
               {difficulty === "easy" && (
                 <span className="text-4xl ml-2 font-bold">{currentNumber}</span>
               )}
@@ -240,7 +216,7 @@ function NumbersGame({ onQuestionAnswered }) {
                       </svg>
                     </div>
                     <div
-                      className="absolute  absolute w-full h-full flex items-center justify-center bg-gray-100"
+                      className="absolute w-full h-full flex items-center justify-center bg-gray-100"
                       style={{
                         backfaceVisibility: "hidden",
                         transform: "rotateY(180deg)",
