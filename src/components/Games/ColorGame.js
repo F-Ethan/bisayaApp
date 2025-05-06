@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { updateProgress } from "../../store/gameSlice";
-import colors from "../../data/colors";
+import { colors, colors_title } from "../../data/colors";
 
 function ColorGame({ onQuestionAnswered }) {
   const { difficulty, volume } = useSelector((state) => state.user);
@@ -13,64 +13,152 @@ function ColorGame({ onQuestionAnswered }) {
   const [options, setOptions] = useState([]);
   const [buttonStates, setButtonStates] = useState(Array(4).fill("neutral"));
   const [showHint, setShowHint] = useState(false);
-  const [showEnglishTitle, setShowEnglishTitle] = useState(false);
+  const [showEnglish, setShowEnglish] = useState(false);
+  const [selectedColorName, setSelectedColorName] = useState("");
+  const [disabledUntilAudio, setDisabledUntilAudio] = useState(Array(4).fill(true));
+  const audioRef = useRef(null);
+  const timeoutRefs = useRef([]);
   const totalQuestions = 5;
 
+  const playAudio = (audioFile) => {
+    if (audioFile && volume > 0) {
+      // Stop any currently playing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      // Create new audio instance
+      audioRef.current = new Audio(audioFile);
+      audioRef.current.volume = volume / 100;
+      audioRef.current.play().catch((error) => console.error("Audio playback error:", error));
+    }
+  };
+
+  const clearTimeouts = () => {
+    timeoutRefs.current.forEach((timeoutId) => clearTimeout(timeoutId));
+    timeoutRefs.current = [];
+  };
+
+  const readOptions = (currentOptions) => {
+    if (difficulty === "easy") {
+      setDisabledUntilAudio(Array(4).fill(true)); // Disable all buttons initially
+      currentOptions.forEach((colorObj, index) => {
+        const timeoutId = setTimeout(() => {
+          setButtonStates((prev) =>
+            prev.map((state, i) => (i === index ? "highlight" : "neutral"))
+          );
+          playAudio(showEnglish ? colorObj.en_audio : colorObj.bis_audio);
+          setDisabledUntilAudio((prev) =>
+            prev.map((val, i) => (i === index ? false : val))
+          );
+        }, index * 1000);
+        timeoutRefs.current.push(timeoutId);
+      });
+      const resetTimeoutId = setTimeout(() => {
+        setButtonStates(Array(4).fill("neutral"));
+        setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons after reading
+      }, currentOptions.length * 1000);
+      timeoutRefs.current.push(resetTimeoutId);
+    } else {
+      setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons in normal mode
+    }
+  };
+
   const generateQuestion = () => {
+    // Select a random correct color
     const colorIndex = Math.floor(Math.random() * colors.length);
     const correctColor = colors[colorIndex];
     setCurrentColor(correctColor);
 
-    const tempOptions = [correctColor.color];
-    while (tempOptions.length < 4) {
-      const randomColor =
-        colors[Math.floor(Math.random() * colors.length)].color;
-      if (!tempOptions.includes(randomColor)) {
-        tempOptions.push(randomColor);
-      }
+    // Select three unique additional colors
+    const tempOptions = [correctColor];
+    const availableColors = colors.filter(
+      (color) => color.bis_color !== correctColor.bis_color
+    );
+    while (tempOptions.length < 4 && availableColors.length > 0) {
+      const randomIndex = Math.floor(Math.random() * availableColors.length);
+      const randomColor = availableColors[randomIndex];
+      tempOptions.push(randomColor);
+      availableColors.splice(randomIndex, 1); // Remove used color to ensure uniqueness
     }
-    setOptions(tempOptions.sort(() => Math.random() - 0.5));
+
+    // Create a stable copy of options and shuffle
+    const shuffledOptions = [...tempOptions].sort(() => Math.random() - 0.5);
+    setOptions(shuffledOptions);
     setButtonStates(Array(4).fill("neutral"));
     setShowHint(false);
-    setShowEnglishTitle(false);
+    setSelectedColorName(""); // Reset selected color name
+    clearTimeouts(); // Clear any existing timeouts
+    playAudio(colors_title[0].bis_audio); // Play Bisaya title audio
+    if (difficulty === "easy") {
+      setTimeout(() => readOptions(shuffledOptions), 2000); // Pass stable options to readOptions
+    } else {
+      readOptions(shuffledOptions);
+    }
   };
 
   useEffect(() => {
     generateQuestion();
-  }, []);
+  }, [currentQuestion]);
 
   const handleAnswerClick = (index, selectedColor) => {
-    if (buttonStates.some((state) => state !== "neutral")) return;
+    if (
+      buttonStates[index] === "tried" ||
+      disabledUntilAudio[index] ||
+      buttonStates.some((state) => state === "correct" || state === "correct-no-border")
+    ) return;
+
+    playAudio(showEnglish ? selectedColor.en_audio : selectedColor.bis_audio);
+    setSelectedColorName(selectedColor.en_color); // Display English color name
 
     const newButtonStates = [...buttonStates];
-    let proceedToNext = false;
 
-    if (selectedColor === currentColor.color) {
-      newButtonStates[index] = "correct";
+    if (selectedColor.bis_color === currentColor.bis_color) {
+      newButtonStates[index] = difficulty === "easy" ? "correct-no-border" : "correct";
       const newScore = localScore + 1;
       setLocalScore(newScore);
-      proceedToNext = true;
-    } else if (difficulty === "normal") {
-      newButtonStates[index] = "incorrect";
-      proceedToNext = true;
+      setButtonStates(newButtonStates);
+      clearTimeouts(); // Stop reading remaining options
+      setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons
+      setTimeout(() => {
+        setButtonStates(newButtonStates.map(() => "neutral"));
+        setSelectedColorName(""); // Clear selected color name
+        if (typeof onQuestionAnswered === "function") {
+          onQuestionAnswered();
+        }
+
+        if (currentQuestion < totalQuestions - 1) {
+          setCurrentQuestion(currentQuestion + 1);
+        } else {
+          setShowResult(true);
+          dispatch(
+            updateProgress({
+              game: "colors",
+              score: localScore,
+              completed: true,
+            })
+          );
+        }
+      }, 1000);
     } else {
       newButtonStates[index] = "incorrect";
-    }
-
-    setButtonStates(newButtonStates);
-
-    if (proceedToNext) {
+      setButtonStates(newButtonStates);
+      setTimeout(() => {
+        setButtonStates((prev) =>
+          prev.map((state, i) => (i === index ? "tried" : state))
+        );
+        setSelectedColorName(""); // Clear selected color name
+      }, 1000);
+      if (difficulty === "normal") {
         setTimeout(() => {
-          // Reset button states to neutral before proceeding
           setButtonStates(newButtonStates.map(() => "neutral"));
-    
+          setSelectedColorName(""); // Clear selected color name
           if (typeof onQuestionAnswered === "function") {
-            onQuestionAnswered(); // Call after delay to ensure effects are visible
+            onQuestionAnswered();
           }
-    
+
           if (currentQuestion < totalQuestions - 1) {
             setCurrentQuestion(currentQuestion + 1);
-            generateQuestion();
           } else {
             setShowResult(true);
             dispatch(
@@ -81,22 +169,30 @@ function ColorGame({ onQuestionAnswered }) {
               })
             );
           }
-        }, 1000); // 1-second delay for visual feedback
+        }, 1000);
+      }
     }
   };
 
   const handleHintClick = () => {
     setShowHint(!showHint);
+    if (!showHint) {
+      playAudio(currentColor.en_audio);
+    }
   };
 
   const handleTitleClick = () => {
-    setShowEnglishTitle(!showEnglishTitle);
+    setShowEnglish(!showEnglish);
+    playAudio(showEnglish ? colors_title[0].bis_audio : colors_title[0].en_audio);
   };
 
   const resetGame = () => {
     setCurrentQuestion(0);
     setLocalScore(0);
     setShowResult(false);
+    setShowEnglish(false);
+    setSelectedColorName("");
+    clearTimeouts();
     dispatch(
       updateProgress({
         game: "colors",
@@ -143,7 +239,22 @@ function ColorGame({ onQuestionAnswered }) {
         .title-text {
           display: inline-block;
           animation: fadeIn 0.3s ease-in;
-          color: ${showEnglishTitle ? "#2563eb" : "black"};
+          color: ${showEnglish ? "#2563eb" : "black"};
+        }
+        .highlight {
+          border: 4px solid #2563eb !important;
+          animation: scale 0.3s ease-in-out;
+        }
+        .correct-no-border {
+          background-color: #d4edda !important;
+          animation: scale 0.3s ease-in-out;
+        }
+        .tried {
+          border: 4px dashed red !important;
+        }
+        .selected-color {
+          animation: fadeIn 0.3s ease-in;
+          color: #2563eb;
         }
         `}
       </style>
@@ -154,12 +265,10 @@ function ColorGame({ onQuestionAnswered }) {
             onClick={handleTitleClick}
           >
             <span
-              key={showEnglishTitle ? "english" : "bisaya"}
+              key={showEnglish ? "english" : "bisaya"}
               className="title-text"
             >
-              {showEnglishTitle
-                ? currentColor.english_title || "No English title"
-                : currentColor.bisaya_title || "No Bisaya title"}
+              {showEnglish ? colors_title[0].bis_title : colors_title[0].en_title}
             </span>
           </h1>
           <div className="text-center mb-4">
@@ -171,7 +280,7 @@ function ColorGame({ onQuestionAnswered }) {
             </button>
             {showHint && (
               <p className="text-lg text-gray-600 mt-2">
-                Hint: {currentColor.translation || "No hint available"}
+                {currentColor.translation || "No hint available"}
               </p>
             )}
           </div>
@@ -182,40 +291,48 @@ function ColorGame({ onQuestionAnswered }) {
               className="w-full h-full object-contain"
             />
           </div>
+          {selectedColorName && (
+            <p className="text-lg text-center mb-4 selected-color">
+              You selected: {selectedColorName}
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-4">
-            {options.map((colorName, index) => {
-              const colorObj = colors.find((c) => c.color === colorName);
-              const isLightColor = ["Puti", "Dalag"].includes(colorName);
-              return (
-                <button
-                  key={index}
-                  onClick={() => handleAnswerClick(index, colorName)}
-                  className={`p-4 rounded-lg text-xl font-semibold bg-white
-                    ${
-                      buttonStates[index] === "correct"
-                        ? "border-4 border-green-500 animate-scale"
-                        : buttonStates[index] === "incorrect"
-                        ? "border-4 border-red-500 animate-shake"
-                        : "border-4 border-gray-300"
-                    }`}
-                  style={{
-                    color: difficulty === "easy" ? colorObj.value : "#000000",
-                    textShadow:
-                      difficulty === "easy"
-                        ? isLightColor
-                          ? "2px 2px 2px #000000"
-                          : "1px 1px 1px #000000"
-                        : "none",
-                  }}
-                  disabled={
-                    buttonStates.some((state) => state !== "neutral") &&
-                    difficulty === "normal"
-                  }
-                >
-                  {colorName}
-                </button>
-              );
-            })}
+            {options.map((colorObj, index) => (
+              <button
+                key={index}
+                onClick={() => handleAnswerClick(index, colorObj)}
+                className={`p-4 rounded-lg text-xl font-medium bg-white
+                  ${
+                    buttonStates[index] === "correct"
+                      ? "border-4 border-green-500 animate-scale"
+                      : buttonStates[index] === "incorrect"
+                      ? "border-4 border-red-500 animate-shake"
+                      : buttonStates[index] === "highlight"
+                      ? "highlight"
+                      : buttonStates[index] === "correct-no-border"
+                      ? "correct-no-border"
+                      : buttonStates[index] === "tried"
+                      ? "tried"
+                      : "border-4 border-gray-300"
+                  }`}
+                style={{
+                  color:
+                    buttonStates[index] === "correct" ||
+                    buttonStates[index] === "incorrect" ||
+                    buttonStates[index] === "correct-no-border" ||
+                    buttonStates[index] === "tried"
+                      ? colorObj.value
+                      : "#000000",
+                }}
+                disabled={
+                  buttonStates[index] === "tried" ||
+                  disabledUntilAudio[index] ||
+                  buttonStates.some((state) => state === "correct" || state === "correct-no-border")
+                }
+              >
+                {showEnglish ? colorObj.en_color : colorObj.bis_color}
+              </button>
+            ))}
           </div>
         </>
       ) : (

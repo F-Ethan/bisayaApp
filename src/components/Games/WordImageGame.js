@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { updateProgress } from "../../store/gameSlice";
 import words from "../../data/words";
 
 function WordImageGame({ onQuestionAnswered }) {
-  const { difficulty, volume, name } = useSelector((state) => state.user);
+  const { difficulty, name } = useSelector((state) => state.user);
   const { score, streak, maxDifficulty } = useSelector((state) => state.game.progress.words);
   const dispatch = useDispatch();
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -17,7 +17,7 @@ function WordImageGame({ onQuestionAnswered }) {
   const [usedHint, setUsedHint] = useState(false);
   const [showEnglishSentence, setShowEnglishSentence] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [filteredWords, setFilteredWords] = useState([]);
+  const [hasGeneratedInitialQuestion, setHasGeneratedInitialQuestion] = useState(false);
   const totalQuestions = 5;
 
   const fallbackWord = {
@@ -29,21 +29,17 @@ function WordImageGame({ onQuestionAnswered }) {
     difficulty: 1,
   };
 
-  // Initialize filtered words based on maxDifficulty
-  useEffect(() => {
-    console.log("Words array:", words);
-    console.log("User difficulty (initial):", difficulty);
-    console.log("Current maxDifficulty:", maxDifficulty);
+  // Memoize filtered words to prevent unnecessary recalculations
+  const filteredWords = useMemo(() => {
     if (!words || !Array.isArray(words) || words.length === 0) {
       console.error("Words array is empty, undefined, or not an array");
-      setFilteredWords([fallbackWord]);
-      return;
+      return [fallbackWord];
     }
 
-    const maxDifficultyForUser = parseInt(maxDifficulty, 10) || 1; // Default to 1 if maxDifficulty is invalid
+    const maxDifficultyForUser = parseInt(maxDifficulty, 10) || 1;
     console.log(`Filtering words for difficulty 1-${maxDifficultyForUser}`);
 
-    // First attempt: strict image validation
+    // Strict validation: prefer static image paths, exclude base64 data URIs
     let validWords = words
       .filter((word) => {
         const wordDifficulty = parseInt(word.difficulty, 10);
@@ -53,8 +49,8 @@ function WordImageGame({ onQuestionAnswered }) {
           : word.filename_path?.default || "/assets/placeholder.png";
         const isValidImage = resolvedImage &&
           typeof resolvedImage === "string" &&
-          !resolvedImage.startsWith("data:image");
-        console.log(`Word: ${word.name_in_bisaya}, Difficulty: ${wordDifficulty}, Image: ${resolvedImage}, Valid: ${isValidDifficulty && isValidImage}`);
+          !resolvedImage.startsWith("data:image") &&
+          resolvedImage.endsWith(".png");
         return isValidDifficulty && isValidImage;
       })
       .map((word) => ({
@@ -68,17 +64,13 @@ function WordImageGame({ onQuestionAnswered }) {
         difficulty: parseInt(word.difficulty, 10),
       }));
 
-    // If no words pass strict image validation, relax image check
+    // Relaxed validation if no words pass strict check
     if (validWords.length === 0) {
-      console.warn("No words passed strict image validation, relaxing image check");
+      console.warn("No words passed strict image validation, allowing any image path");
       validWords = words
         .filter((word) => {
           const wordDifficulty = parseInt(word.difficulty, 10);
           const isValidDifficulty = !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
-          const resolvedImage = typeof word.filename_path === "string"
-            ? word.filename_path
-            : word.filename_path?.default || "/assets/placeholder.png";
-          console.log(`Relaxed check - Word: ${word.name_in_bisaya}, Difficulty: ${wordDifficulty}, Image: ${resolvedImage}`);
           return isValidDifficulty;
         })
         .map((word) => ({
@@ -93,10 +85,9 @@ function WordImageGame({ onQuestionAnswered }) {
         }));
     }
 
-    console.log(`Filtered words count (difficulty 1-${maxDifficultyForUser}): ${validWords.length}`);
-    console.log("Filtered words:", validWords);
-    setFilteredWords(validWords.length > 0 ? validWords : [fallbackWord]);
-  }, [maxDifficulty]);
+    console.log(`Filtered words count: ${validWords.length}`);
+    return validWords.length > 0 ? validWords : [fallbackWord];
+  }, [maxDifficulty, words, fallbackWord]);
 
   const generateQuestion = useCallback(() => {
     if (filteredWords.length === 0) {
@@ -108,9 +99,6 @@ function WordImageGame({ onQuestionAnswered }) {
 
     const wordIndex = Math.floor(Math.random() * filteredWords.length);
     const correctWord = filteredWords[wordIndex] || fallbackWord;
-    setCurrentWord(correctWord);
-    console.log("Generated currentWord:", correctWord);
-
     const tempOptions = [correctWord];
     const availableWords = filteredWords.filter((w) => w.name !== correctWord.name);
     while (tempOptions.length < 4 && availableWords.length > 0) {
@@ -127,13 +115,17 @@ function WordImageGame({ onQuestionAnswered }) {
     setUsedHint(false);
     setShowEnglishSentence(false);
     setIsProcessing(false);
-  }, [filteredWords]);
+    setCurrentWord(correctWord);
+    console.log("Generated currentWord:", correctWord.name);
+  }, [filteredWords, fallbackWord]);
 
+  // Generate initial question only when filteredWords is first populated
   useEffect(() => {
-    if (filteredWords.length > 0) {
+    if (filteredWords.length > 0 && !hasGeneratedInitialQuestion) {
       generateQuestion();
+      setHasGeneratedInitialQuestion(true);
     }
-  }, [generateQuestion, filteredWords]);
+  }, [filteredWords, hasGeneratedInitialQuestion]);
 
   const handleAnswerClick = (index, selectedWord, event) => {
     event.preventDefault();
@@ -153,13 +145,13 @@ function WordImageGame({ onQuestionAnswered }) {
         const newStreak = streak + 1;
         let newMaxDifficulty = maxDifficulty;
         if (newStreak >= 10) {
-          newMaxDifficulty = maxDifficulty + 1; // Increment maxDifficulty
+          newMaxDifficulty = maxDifficulty + 1;
           alert(`Great job${name ? ", " + name : ""}! You reached a streak of 10 and unlocked level ${newMaxDifficulty}!`);
           dispatch(updateProgress({
             game: "words",
             score: newScore,
             completed: false,
-            streak: 0, // Reset streak after reaching 10
+            streak: 0,
             maxDifficulty: newMaxDifficulty,
           }));
         } else {
@@ -235,6 +227,7 @@ function WordImageGame({ onQuestionAnswered }) {
     setCurrentQuestion(0);
     setLocalScore(0);
     setShowResult(false);
+    setHasGeneratedInitialQuestion(false);
     dispatch(updateProgress({
       game: "words",
       score: 0,
@@ -247,6 +240,8 @@ function WordImageGame({ onQuestionAnswered }) {
   if (!currentWord) {
     return <div>Loading...</div>;
   }
+
+  const progressPercentage = (streak / 10) * 100;
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -310,9 +305,8 @@ function WordImageGame({ onQuestionAnswered }) {
                 : currentWord.bisaya_sentence || "No Bisaya sentence"}
             </span>
           </h1>
-          <div className="flex justify-between mb-4">
-            <p className="text-lg">Streak: {streak}</p>
-            <p className="text-lg">Difficulty: Up to {maxDifficulty}</p>
+          <div className="flex justify-end mb-4">
+            <p className="text-lg">difficulty: {maxDifficulty}</p>
           </div>
           <div className="text-3xl font-bold text-center mb-2">{currentWord.name || "Loading..."}</div>
           <div className="text-center mb-4">
@@ -354,6 +348,17 @@ function WordImageGame({ onQuestionAnswered }) {
               </button>
             ))}
           </div>
+          <div className="mt-6">
+            <p className="text-lg text-center mb-2">
+              Progress to level {maxDifficulty + 1}: {streak}/10
+            </p>
+            <div className="w-full bg-gray-200 rounded-full h-4">
+              <div
+                className="bg-green-500 h-4 rounded-full transition-all duration-300"
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+          </div>
         </>
       ) : (
         <div className="text-center">
@@ -361,7 +366,7 @@ function WordImageGame({ onQuestionAnswered }) {
           <p className="text-xl">
             Your score: {localScore} out of {totalQuestions}
           </p>
-          <p className="text-lg">Level {maxDifficulty}</p>
+          <p className="text-lg">difficulty: {maxDifficulty}</p>
           <button
             className="mt-4 bg-green-500 text-white px-4 py-2 rounded-lg text-xl hover:bg-green-700"
             onClick={resetGame}

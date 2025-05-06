@@ -13,7 +13,7 @@ function Play() {
     { component: ColorGame, name: "Colors" },
     { component: NumbersGame, name: "Numbers" },
     { component: WordImageGame, name: "Words" },
-    { component: BookGame, name: "Books" },
+    //{ component: BookGame, name: "Books" },
 
   ];
 
@@ -52,9 +52,7 @@ function Play() {
       </div>
 
       {/* Game Title and Content */}
-      <h1 className="text-3xl font-bold mb-4 text-center">
-        Learn Bisaya - {games[currentGameIndex].name}
-      </h1>
+      
       <CurrentGame onQuestionAnswered={handleQuestionAnswered} />
     </div>
   );

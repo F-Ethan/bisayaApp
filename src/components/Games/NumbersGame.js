@@ -152,9 +152,6 @@ function NumbersGame({ onQuestionAnswered }) {
               aria-label="Replay question audio"
             >
               {bisayaNumbersTitles.find((item) => item.number === currentNumber)?.bisaya || ""}
-              {difficulty === "easy" && (
-                <span className="text-4xl ml-2 font-bold">{currentNumber}</span>
-              )}
               <span className="ml-2 text-blue-500 hover:text-blue-700">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -172,6 +169,9 @@ function NumbersGame({ onQuestionAnswered }) {
                 </svg>
               </span>
             </button>
+            {difficulty === "easy" && (
+                <h1 className="text-6xl ml-2 font-bold mt-3">{currentNumber}</h1>
+              )}
           </h1>
           <div className="flex justify-center w-full">
             <div className="grid grid-cols-2 gap-4 max-w-md">
