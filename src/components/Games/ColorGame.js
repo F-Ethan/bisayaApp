@@ -51,13 +51,13 @@ function ColorGame({ onQuestionAnswered }) {
           setDisabledUntilAudio((prev) =>
             prev.map((val, i) => (i === index ? false : val))
           );
-        }, index * 1000);
+        }, index * 1500);
         timeoutRefs.current.push(timeoutId);
       });
       const resetTimeoutId = setTimeout(() => {
         setButtonStates(Array(4).fill("neutral"));
         setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons after reading
-      }, currentOptions.length * 1000);
+      }, currentOptions.length * 1500);
       timeoutRefs.current.push(resetTimeoutId);
     } else {
       setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons in normal mode
