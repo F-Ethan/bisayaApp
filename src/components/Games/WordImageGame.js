@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { updateProgress } from "../../store/gameSlice";
 import words from "../../data/words";
 
 function WordImageGame({ onQuestionAnswered }) {
-  const { difficulty, name } = useSelector((state) => state.user);
+  const { difficulty, name, volume } = useSelector((state) => state.user);
   const { score, streak, maxDifficulty } = useSelector((state) => state.game.progress.words);
   const dispatch = useDispatch();
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -18,6 +18,8 @@ function WordImageGame({ onQuestionAnswered }) {
   const [showEnglishSentence, setShowEnglishSentence] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasGeneratedInitialQuestion, setHasGeneratedInitialQuestion] = useState(false);
+  const [disabledButtons, setDisabledButtons] = useState(Array(4).fill(false));
+  const audioRef = useRef(null);
   const totalQuestions = 5;
 
   const fallbackWord = {
@@ -27,6 +29,26 @@ function WordImageGame({ onQuestionAnswered }) {
     bisaya_sentence: "This is a fallback word.",
     english_sentence: "This is a fallback word.",
     difficulty: 1,
+    en_audio: null,
+    bis_audio: null,
+  };
+
+  // Function to play audio
+  const playAudio = (audioFile) => {
+    if (audioFile && volume > 0) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      try {
+        const audioPath = typeof audioFile === "string" ? audioFile : audioFile.default;
+        audioRef.current = new Audio(audioPath);
+        audioRef.current.volume = volume / 100;
+        audioRef.current.play().catch((error) => console.error("Audio playback error:", error));
+      } catch (error) {
+        console.error("Error loading audio file:", error);
+      }
+    }
   };
 
   // Memoize filtered words to prevent unnecessary recalculations
@@ -44,9 +66,9 @@ function WordImageGame({ onQuestionAnswered }) {
       .filter((word) => {
         const wordDifficulty = parseInt(word.difficulty, 10);
         const isValidDifficulty = !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
-        const resolvedImage = typeof word.filename_path === "string"
-          ? word.filename_path
-          : word.filename_path?.default || "/assets/placeholder.png";
+        const resolvedImage = typeof word.image_filepath === "string"
+          ? word.image_filepath
+          : word.image_filepath?.default || "/assets/placeholder.png";
         const isValidImage = resolvedImage &&
           typeof resolvedImage === "string" &&
           !resolvedImage.startsWith("data:image") &&
@@ -54,14 +76,16 @@ function WordImageGame({ onQuestionAnswered }) {
         return isValidDifficulty && isValidImage;
       })
       .map((word) => ({
-        name: word.name_in_bisaya || "Unknown",
-        translation: word.image_name || "",
-        image: typeof word.filename_path === "string"
-          ? word.filename_path
-          : word.filename_path?.default || "/assets/placeholder.png",
-        bisaya_sentence: word.sentence_in_bisaya || "",
-        english_sentence: word.sentence || "",
+        name: word.bis_name || "Unknown",
+        translation: word.en_name || "",
+        image: typeof word.image_filepath === "string"
+          ? word.image_filepath
+          : word.image_filepath?.default || "/assets/placeholder.png",
+        bisaya_sentence: word.bis_sentence || "",
+        english_sentence: word.en_sentence || "",
         difficulty: parseInt(word.difficulty, 10),
+        en_audio: word.en_audio?.default || word.en_audio || null,
+        bis_audio: word.bis_audio?.default || word.bis_audio || null,
       }));
 
     // Relaxed validation if no words pass strict check
@@ -74,20 +98,22 @@ function WordImageGame({ onQuestionAnswered }) {
           return isValidDifficulty;
         })
         .map((word) => ({
-          name: word.name_in_bisaya || "Unknown",
-          translation: word.image_name || "",
-          image: typeof word.filename_path === "string"
-            ? word.filename_path
-            : word.filename_path?.default || "/assets/placeholder.png",
-          bisaya_sentence: word.sentence_in_bisaya || "",
-          english_sentence: word.sentence || "",
+          name: word.bis_name || "Unknown",
+          translation: word.en_name || "",
+          image: typeof word.image_filepath === "string"
+            ? word.image_filepath
+            : word.image_filepath?.default || "/assets/placeholder.png",
+          bisaya_sentence: word.bis_sentence || "",
+          english_sentence: word.en_sentence || "",
           difficulty: parseInt(word.difficulty, 10),
+          en_audio: word.en_audio?.default || word.en_audio || null,
+          bis_audio: word.bis_audio?.default || word.bis_audio || null,
         }));
     }
 
     console.log(`Filtered words count: ${validWords.length}`);
     return validWords.length > 0 ? validWords : [fallbackWord];
-  }, [maxDifficulty, words, fallbackWord]);
+  }, [maxDifficulty]);
 
   const generateQuestion = useCallback(() => {
     if (filteredWords.length === 0) {
@@ -109,15 +135,18 @@ function WordImageGame({ onQuestionAnswered }) {
     while (tempOptions.length < 4) {
       tempOptions.push(fallbackWord);
     }
-    setOptions(tempOptions.sort(() => Math.random() - 0.5));
+    const shuffledOptions = tempOptions.sort(() => Math.random() - 0.5);
+    setOptions(shuffledOptions);
     setButtonStates(Array(4).fill("neutral"));
+    setDisabledButtons(Array(4).fill(false));
     setShowHint(false);
     setUsedHint(false);
     setShowEnglishSentence(false);
     setIsProcessing(false);
     setCurrentWord(correctWord);
+    playAudio(correctWord.bis_audio); // Play Bisaya audio on question load
     console.log("Generated currentWord:", correctWord.name);
-  }, [filteredWords, fallbackWord]);
+  }, [filteredWords]);
 
   // Generate initial question only when filteredWords is first populated
   useEffect(() => {
@@ -125,20 +154,22 @@ function WordImageGame({ onQuestionAnswered }) {
       generateQuestion();
       setHasGeneratedInitialQuestion(true);
     }
-  }, [filteredWords, hasGeneratedInitialQuestion]);
+  }, [filteredWords, hasGeneratedInitialQuestion, generateQuestion]);
 
   const handleAnswerClick = (index, selectedWord, event) => {
     event.preventDefault();
-    if (isProcessing || buttonStates.some((state) => state !== "neutral")) {
+    if (isProcessing || disabledButtons[index] || buttonStates.some((state) => state === "correct")) {
       return;
     }
 
     setIsProcessing(true);
-    const newButtonStates = Array(4).fill("neutral");
-    newButtonStates[index] = selectedWord.name === currentWord.name ? "correct" : "incorrect";
-    setButtonStates(newButtonStates);
+    playAudio(showEnglishSentence ? selectedWord.en_audio : selectedWord.bis_audio);
+    const newButtonStates = [...buttonStates];
+    const newDisabledButtons = [...disabledButtons];
 
     if (selectedWord.name === currentWord.name) {
+      newButtonStates[index] = "correct";
+      setButtonStates(newButtonStates);
       const newScore = localScore + 1;
       setLocalScore(newScore);
       if (!usedHint) {
@@ -164,41 +195,76 @@ function WordImageGame({ onQuestionAnswered }) {
           }));
         }
       }
+      setTimeout(() => {
+        setButtonStates(Array(4).fill("neutral"));
+        setDisabledButtons(Array(4).fill(false));
+        if (typeof onQuestionAnswered === "function") {
+          onQuestionAnswered();
+        }
+        if (currentQuestion < totalQuestions - 1) {
+          setCurrentQuestion(currentQuestion + 1);
+          generateQuestion();
+        } else {
+          setShowResult(true);
+          dispatch(updateProgress({
+            game: "words",
+            score: localScore,
+            completed: true,
+            maxDifficulty: maxDifficulty,
+          }));
+        }
+        setIsProcessing(false);
+      }, 2000); // Increased to 2 seconds
     } else {
-      dispatch(updateProgress({
-        game: "words",
-        score: localScore,
-        completed: false,
-        streak: 0,
-        maxDifficulty: maxDifficulty,
-      }));
-    }
-
-    setTimeout(() => {
-      setButtonStates(Array(4).fill("neutral"));
-      if (typeof onQuestionAnswered === "function") {
-        onQuestionAnswered();
-      }
-      if (currentQuestion < totalQuestions - 1) {
-        setCurrentQuestion(currentQuestion + 1);
-        generateQuestion();
+      newButtonStates[index] = "incorrect";
+      setButtonStates(newButtonStates);
+      if (difficulty === "easy") {
+        newDisabledButtons[index] = true;
+        setDisabledButtons(newDisabledButtons);
+        setTimeout(() => {
+          newButtonStates[index] = "tried";
+          setButtonStates(newButtonStates);
+          setIsProcessing(false);
+        }, 1000); // Show incorrect animation briefly, then mark as tried
       } else {
-        setShowResult(true);
         dispatch(updateProgress({
           game: "words",
           score: localScore,
-          completed: true,
+          completed: false,
+          streak: 0,
           maxDifficulty: maxDifficulty,
         }));
+        setTimeout(() => {
+          setButtonStates(Array(4).fill("neutral"));
+          setDisabledButtons(Array(4).fill(false));
+          if (typeof onQuestionAnswered === "function") {
+            onQuestionAnswered();
+          }
+          if (currentQuestion < totalQuestions - 1) {
+            setCurrentQuestion(currentQuestion + 1);
+            generateQuestion();
+          } else {
+            setShowResult(true);
+            dispatch(updateProgress({
+              game: "words",
+              score: localScore,
+              completed: true,
+              maxDifficulty: maxDifficulty,
+            }));
+          }
+          setIsProcessing(false);
+        }, 3000); // Increased to 2 seconds
       }
-      setIsProcessing(false);
-    }, 800);
+    }
   };
 
   const handleHintClick = () => {
     if (isProcessing) return;
     setShowHint(!showHint);
     setUsedHint(true);
+    if (!showHint) {
+      playAudio(currentWord.en_audio);
+    }
     dispatch(updateProgress({
       game: "words",
       score: localScore,
@@ -211,6 +277,7 @@ function WordImageGame({ onQuestionAnswered }) {
   const handleTitleClick = () => {
     if (isProcessing) return;
     setShowEnglishSentence(!showEnglishSentence);
+    playAudio(showEnglishSentence ? currentWord.bis_audio : currentWord.en_audio);
     if (!usedHint) {
       setUsedHint(true);
       dispatch(updateProgress({
@@ -228,6 +295,8 @@ function WordImageGame({ onQuestionAnswered }) {
     setLocalScore(0);
     setShowResult(false);
     setHasGeneratedInitialQuestion(false);
+    setShowEnglishSentence(false);
+    setDisabledButtons(Array(4).fill(false));
     dispatch(updateProgress({
       game: "words",
       score: 0,
@@ -294,6 +363,10 @@ function WordImageGame({ onQuestionAnswered }) {
             border-color: #ef4444 !important;
             animation: shake 0.3s ease-in-out;
           }
+          .card-tried {
+            border: 4px dashed #ef4444 !important;
+            opacity: 0.5;
+          }
         `}
       </style>
       {!showResult ? (
@@ -329,12 +402,13 @@ function WordImageGame({ onQuestionAnswered }) {
                 key={index}
                 onClick={(e) => handleAnswerClick(index, option, e)}
                 className={`p-2 rounded-lg border-4 transition-all duration-200
-                  ${isProcessing ? "disabled-button" : ""}
+                  ${isProcessing || disabledButtons[index] ? "disabled-button" : ""}
                   ${buttonStates[index] === "correct" ? "card-correct" : ""}
                   ${buttonStates[index] === "incorrect" ? "card-incorrect" : ""}
+                  ${buttonStates[index] === "tried" ? "card-tried" : ""}
                   ${difficulty === "easy" && option.name === currentWord.name && buttonStates[index] === "neutral" ? "border-green-300" : "border-gray-300"}
                 `}
-                disabled={isProcessing || buttonStates.some((state) => state !== "neutral")}
+                disabled={isProcessing || disabledButtons[index] || buttonStates.some((state) => state === "correct")}
               >
                 <img
                   src={option.image || "/assets/placeholder.png"}
