@@ -22,6 +22,8 @@ function WordImageGame({ onQuestionAnswered }) {
   const audioRef = useRef(null);
   const totalQuestions = 5;
 
+  const isSingleQuestionMode = typeof onQuestionAnswered === "function";
+
   const fallbackWord = {
     name: "Fallback",
     translation: "placeholder",
@@ -51,6 +53,15 @@ function WordImageGame({ onQuestionAnswered }) {
     }
   };
 
+  // Function to stop any playing audio
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+  };
+
   // Memoize filtered words to prevent unnecessary recalculations
   const filteredWords = useMemo(() => {
     if (!words || !Array.isArray(words) || words.length === 0) {
@@ -61,15 +72,17 @@ function WordImageGame({ onQuestionAnswered }) {
     const maxDifficultyForUser = parseInt(maxDifficulty, 10) || 1;
     console.log(`Filtering words for difficulty 1-${maxDifficultyForUser}`);
 
-    // Strict validation: prefer static image paths, exclude base64 data URIs
     let validWords = words
       .filter((word) => {
         const wordDifficulty = parseInt(word.difficulty, 10);
-        const isValidDifficulty = !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
-        const resolvedImage = typeof word.image_filepath === "string"
-          ? word.image_filepath
-          : word.image_filepath?.default || "/assets/placeholder.png";
-        const isValidImage = resolvedImage &&
+        const isValidDifficulty =
+          !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
+        const resolvedImage =
+          typeof word.image_filepath === "string"
+            ? word.image_filepath
+            : word.image_filepath?.default || "/assets/placeholder.png";
+        const isValidImage =
+          resolvedImage &&
           typeof resolvedImage === "string" &&
           !resolvedImage.startsWith("data:image") &&
           resolvedImage.endsWith(".png");
@@ -78,9 +91,10 @@ function WordImageGame({ onQuestionAnswered }) {
       .map((word) => ({
         name: word.bis_name || "Unknown",
         translation: word.en_name || "",
-        image: typeof word.image_filepath === "string"
-          ? word.image_filepath
-          : word.image_filepath?.default || "/assets/placeholder.png",
+        image:
+          typeof word.image_filepath === "string"
+            ? word.image_filepath
+            : word.image_filepath?.default || "/assets/placeholder.png",
         bisaya_sentence: word.bis_sentence || "",
         english_sentence: word.en_sentence || "",
         difficulty: parseInt(word.difficulty, 10),
@@ -88,21 +102,22 @@ function WordImageGame({ onQuestionAnswered }) {
         bis_audio: word.bis_audio?.default || word.bis_audio || null,
       }));
 
-    // Relaxed validation if no words pass strict check
     if (validWords.length === 0) {
       console.warn("No words passed strict image validation, allowing any image path");
       validWords = words
         .filter((word) => {
           const wordDifficulty = parseInt(word.difficulty, 10);
-          const isValidDifficulty = !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
+          const isValidDifficulty =
+            !isNaN(wordDifficulty) && wordDifficulty >= 1 && wordDifficulty <= maxDifficultyForUser;
           return isValidDifficulty;
         })
         .map((word) => ({
           name: word.bis_name || "Unknown",
           translation: word.en_name || "",
-          image: typeof word.image_filepath === "string"
-            ? word.image_filepath
-            : word.image_filepath?.default || "/assets/placeholder.png",
+          image:
+            typeof word.image_filepath === "string"
+              ? word.image_filepath
+              : word.image_filepath?.default || "/assets/placeholder.png",
           bisaya_sentence: word.bis_sentence || "",
           english_sentence: word.en_sentence || "",
           difficulty: parseInt(word.difficulty, 10),
@@ -114,6 +129,27 @@ function WordImageGame({ onQuestionAnswered }) {
     console.log(`Filtered words count: ${validWords.length}`);
     return validWords.length > 0 ? validWords : [fallbackWord];
   }, [maxDifficulty]);
+
+  // Preload audio files to reduce playback latency
+  useEffect(() => {
+    const preloadAudios = () => {
+      filteredWords.forEach((word) => {
+        if (word.bis_audio) {
+          const bisAudio = new Audio(
+            typeof word.bis_audio === "string" ? word.bis_audio : word.bis_audio.default
+          );
+          bisAudio.preload = "auto";
+        }
+        if (word.en_audio) {
+          const enAudio = new Audio(
+            typeof word.en_audio === "string" ? word.en_audio : word.en_audio.default
+          );
+          enAudio.preload = "auto";
+        }
+      });
+    };
+    preloadAudios();
+  }, [filteredWords]);
 
   const generateQuestion = useCallback(() => {
     if (filteredWords.length === 0) {
@@ -144,11 +180,10 @@ function WordImageGame({ onQuestionAnswered }) {
     setShowEnglishSentence(false);
     setIsProcessing(false);
     setCurrentWord(correctWord);
-    playAudio(correctWord.bis_audio); // Play Bisaya audio on question load
+    playAudio(correctWord.bis_audio);
     console.log("Generated currentWord:", correctWord.name);
   }, [filteredWords]);
 
-  // Generate initial question only when filteredWords is first populated
   useEffect(() => {
     if (filteredWords.length > 0 && !hasGeneratedInitialQuestion) {
       generateQuestion();
@@ -172,88 +207,132 @@ function WordImageGame({ onQuestionAnswered }) {
       setButtonStates(newButtonStates);
       const newScore = localScore + 1;
       setLocalScore(newScore);
-      if (!usedHint) {
+      if (!usedHint && !isSingleQuestionMode) {
         const newStreak = streak + 1;
         let newMaxDifficulty = maxDifficulty;
         if (newStreak >= 10) {
           newMaxDifficulty = maxDifficulty + 1;
-          alert(`Great job${name ? ", " + name : ""}! You reached a streak of 10 and unlocked level ${newMaxDifficulty}!`);
-          dispatch(updateProgress({
-            game: "words",
-            score: newScore,
-            completed: false,
-            streak: 0,
-            maxDifficulty: newMaxDifficulty,
-          }));
+          alert(
+            `Great job${name ? ", " + name : ""}! You reached a streak of 10 and unlocked level ${newMaxDifficulty}!`
+          );
+          dispatch(
+            updateProgress({
+              game: "words",
+              score: newScore,
+              completed: false,
+              streak: 0,
+              maxDifficulty: newMaxDifficulty,
+            })
+          );
         } else {
-          dispatch(updateProgress({
-            game: "words",
-            score: newScore,
-            completed: false,
-            streak: newStreak,
-            maxDifficulty: newMaxDifficulty,
-          }));
+          dispatch(
+            updateProgress({
+              game: "words",
+              score: newScore,
+              completed: false,
+              streak: newStreak,
+              maxDifficulty: newMaxDifficulty,
+            })
+          );
         }
       }
       setTimeout(() => {
         setButtonStates(Array(4).fill("neutral"));
         setDisabledButtons(Array(4).fill(false));
-        if (typeof onQuestionAnswered === "function") {
-          onQuestionAnswered();
+        if (isSingleQuestionMode) {
+          stopAudio();
+          console.log("Calling onQuestionAnswered");
+          if (typeof onQuestionAnswered === "function") {
+            onQuestionAnswered();
+          }
+          setIsProcessing(false);
+          return;
         }
         if (currentQuestion < totalQuestions - 1) {
           setCurrentQuestion(currentQuestion + 1);
           generateQuestion();
         } else {
           setShowResult(true);
-          dispatch(updateProgress({
-            game: "words",
-            score: localScore,
-            completed: true,
-            maxDifficulty: maxDifficulty,
-          }));
+          dispatch(
+            updateProgress({
+              game: "words",
+              score: newScore,
+              completed: true,
+              maxDifficulty: maxDifficulty,
+            })
+          );
         }
         setIsProcessing(false);
-      }, 2000); // Increased to 2 seconds
+      }, 2000);
     } else {
       newButtonStates[index] = "incorrect";
       setButtonStates(newButtonStates);
+      if (!isSingleQuestionMode) {
+        dispatch(
+          updateProgress({
+            game: "words",
+            score: localScore,
+            completed: false,
+            streak: 0,
+            maxDifficulty: maxDifficulty,
+          })
+        );
+      } else {
+        dispatch(
+          updateProgress({
+            game: "words",
+            streak: 0,
+            completed: false,
+            maxDifficulty: maxDifficulty,
+          })
+        );
+      }
       if (difficulty === "easy") {
         newDisabledButtons[index] = true;
         setDisabledButtons(newDisabledButtons);
         setTimeout(() => {
           newButtonStates[index] = "tried";
           setButtonStates(newButtonStates);
+          if (isSingleQuestionMode) {
+            stopAudio();
+            console.log("Calling onQuestionAnswered (easy mode)");
+            if (typeof onQuestionAnswered === "function") {
+              onQuestionAnswered();
+            }
+            setIsProcessing(false);
+            return;
+          }
           setIsProcessing(false);
-        }, 1000); // Show incorrect animation briefly, then mark as tried
+        }, 1000);
       } else {
-        dispatch(updateProgress({
-          game: "words",
-          score: localScore,
-          completed: false,
-          streak: 0,
-          maxDifficulty: maxDifficulty,
-        }));
         setTimeout(() => {
           setButtonStates(Array(4).fill("neutral"));
           setDisabledButtons(Array(4).fill(false));
-          if (typeof onQuestionAnswered === "function") {
-            onQuestionAnswered();
+          if (isSingleQuestionMode) {
+            stopAudio();
+            console.log("Calling onQuestionAnswered (non-easy mode)");
+            if (typeof onQuestionAnswered === "function") {
+              onQuestionAnswered();
+            }
+            setIsProcessing(false);
+            return;
           }
           if (currentQuestion < totalQuestions - 1) {
             setCurrentQuestion(currentQuestion + 1);
             generateQuestion();
           } else {
             setShowResult(true);
-            dispatch(updateProgress({
-              game: "words",
-              score: localScore,
-              completed: true,
-              maxDifficulty: maxDifficulty,
-            }));
+            dispatch(
+              updateProgress({
+                game: "words",
+                score: localScore,
+                completed: true,
+                maxDifficulty: maxDifficulty,
+              })
+            );
           }
           setIsProcessing(false);
-        }, 3000); // Increased to 2 seconds
+        }, 3000);
       }
     }
   };
@@ -261,17 +340,19 @@ function WordImageGame({ onQuestionAnswered }) {
   const handleHintClick = () => {
     if (isProcessing) return;
     setShowHint(!showHint);
-    setUsedHint(true);
     if (!showHint) {
+      setUsedHint(true);
       playAudio(currentWord.en_audio);
+      dispatch(
+        updateProgress({
+          game: "words",
+          score: isSingleQuestionMode ? undefined : localScore,
+          completed: false,
+          streak: 0,
+          maxDifficulty: maxDifficulty,
+        })
+      );
     }
-    dispatch(updateProgress({
-      game: "words",
-      score: localScore,
-      completed: false,
-      streak: 0,
-      maxDifficulty: maxDifficulty,
-    }));
   };
 
   const handleTitleClick = () => {
@@ -280,13 +361,15 @@ function WordImageGame({ onQuestionAnswered }) {
     playAudio(showEnglishSentence ? currentWord.bis_audio : currentWord.en_audio);
     if (!usedHint) {
       setUsedHint(true);
-      dispatch(updateProgress({
-        game: "words",
-        score: localScore,
-        completed: false,
-        streak: 0,
-        maxDifficulty: maxDifficulty,
-      }));
+      dispatch(
+        updateProgress({
+          game: "words",
+          score: isSingleQuestionMode ? undefined : localScore,
+          completed: false,
+          streak: 0,
+          maxDifficulty: maxDifficulty,
+        })
+      );
     }
   };
 
@@ -297,12 +380,15 @@ function WordImageGame({ onQuestionAnswered }) {
     setHasGeneratedInitialQuestion(false);
     setShowEnglishSentence(false);
     setDisabledButtons(Array(4).fill(false));
-    dispatch(updateProgress({
-      game: "words",
-      score: 0,
-      completed: false,
-      maxDifficulty: maxDifficulty,
-    }));
+    stopAudio();
+    dispatch(
+      updateProgress({
+        game: "words",
+        score: isSingleQuestionMode ? undefined : 0,
+        completed: false,
+        maxDifficulty: maxDifficulty,
+      })
+    );
     generateQuestion();
   };
 
@@ -378,7 +464,7 @@ function WordImageGame({ onQuestionAnswered }) {
                 : currentWord.bisaya_sentence || "No Bisaya sentence"}
             </span>
           </h1>
-          <div className="flex justify-end mb-4">
+          <div className="flex Analysis justification-end mb-4">
             <p className="text-lg">difficulty: {maxDifficulty}</p>
           </div>
           <div className="text-3xl font-bold text-center mb-2">{currentWord.name || "Loading..."}</div>
@@ -406,8 +492,13 @@ function WordImageGame({ onQuestionAnswered }) {
                   ${buttonStates[index] === "correct" ? "card-correct" : ""}
                   ${buttonStates[index] === "incorrect" ? "card-incorrect" : ""}
                   ${buttonStates[index] === "tried" ? "card-tried" : ""}
-                  ${difficulty === "easy" && option.name === currentWord.name && buttonStates[index] === "neutral" ? "border-green-300" : "border-gray-300"}
-                `}
+                  ${
+                    difficulty === "easy" &&
+                    option.name === currentWord.name &&
+                    buttonStates[index] === "neutral"
+                      ? "border-green-300"
+                      : "border-gray-300"
+                  }`}
                 disabled={isProcessing || disabledButtons[index] || buttonStates.some((state) => state === "correct")}
               >
                 <img

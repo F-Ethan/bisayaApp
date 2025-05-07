@@ -39,26 +39,71 @@ function ColorGame({ onQuestionAnswered }) {
     timeoutRefs.current = [];
   };
 
-  const readOptions = (currentOptions) => {
+  const readOptions = async (currentOptions) => {
     if (difficulty === "easy") {
       setDisabledUntilAudio(Array(4).fill(true)); // Disable all buttons initially
-      currentOptions.forEach((colorObj, index) => {
-        const timeoutId = setTimeout(() => {
-          setButtonStates((prev) =>
-            prev.map((state, i) => (i === index ? "highlight" : "neutral"))
+
+      // Helper function to play audio and wait for it to finish
+      const playAudioAndWait = (audioFile, index = -1) => {
+        return new Promise((resolve) => {
+          if (!audioFile || volume === 0) {
+            resolve();
+            return;
+          }
+
+          const audio = new Audio(audioFile);
+          audio.volume = volume / 100;
+
+          // Wait for the audio to be ready to play
+          audio.addEventListener(
+            "canplaythrough",
+            () => {
+              if (index >= 0) {
+                // Only update button states for option buttons, not title
+                setButtonStates((prev) =>
+                  prev.map((state, i) => (i === index ? "highlight" : "neutral"))
+                );
+                setDisabledUntilAudio((prev) =>
+                  prev.map((val, i) => (i === index ? false : val))
+                );
+              }
+              audio.play().catch((error) => {
+                console.error("Audio playback error:", error);
+                resolve(); // Resolve even if playback fails to avoid hanging
+              });
+            },
+            { once: true }
           );
-          playAudio(showEnglish ? colorObj.en_audio : colorObj.bis_audio);
-          setDisabledUntilAudio((prev) =>
-            prev.map((val, i) => (i === index ? false : val))
+
+          // Resolve when the audio finishes playing
+          audio.addEventListener("ended", () => {
+            resolve();
+          }, { once: true });
+
+          // Handle errors during loading
+          audio.addEventListener(
+            "error",
+            () => {
+              console.error("Audio loading error:", audio.error);
+              resolve(); // Resolve to continue the sequence
+            },
+            { once: true }
           );
-        }, index * 2000);
-        timeoutRefs.current.push(timeoutId);
-      });
-      const resetTimeoutId = setTimeout(() => {
-        setButtonStates(Array(4).fill("neutral"));
-        setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons after reading
-      }, currentOptions.length * 2000);
-      timeoutRefs.current.push(resetTimeoutId);
+        });
+      };
+
+      // Play title audio first
+      await playAudioAndWait(showEnglish ? colors_title[0].en_audio : colors_title[0].bis_audio);
+
+      // Play each option audio sequentially
+      for (let index = 0; index < currentOptions.length; index++) {
+        const colorObj = currentOptions[index];
+        await playAudioAndWait(showEnglish ? colorObj.en_audio : colorObj.bis_audio, index);
+      }
+
+      // Reset button states after all audios have played
+      setButtonStates(Array(4).fill("neutral"));
+      setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons after reading
     } else {
       setDisabledUntilAudio(Array(4).fill(false)); // Enable all buttons in normal mode
     }
@@ -89,12 +134,7 @@ function ColorGame({ onQuestionAnswered }) {
     setShowHint(false);
     setSelectedColorName(""); // Reset selected color name
     clearTimeouts(); // Clear any existing timeouts
-    playAudio(colors_title[0].bis_audio); // Play Bisaya title audio
-    if (difficulty === "easy") {
-      setTimeout(() => readOptions(shuffledOptions), 2000); // Pass stable options to readOptions
-    } else {
-      readOptions(shuffledOptions);
-    }
+    readOptions(shuffledOptions); // Call readOptions directly
   };
 
   useEffect(() => {
@@ -106,7 +146,8 @@ function ColorGame({ onQuestionAnswered }) {
       buttonStates[index] === "tried" ||
       disabledUntilAudio[index] ||
       buttonStates.some((state) => state === "correct" || state === "correct-no-border")
-    ) return;
+    )
+      return;
 
     playAudio(showEnglish ? selectedColor.en_audio : selectedColor.bis_audio);
     setSelectedColorName(selectedColor.en_color); // Display English color name
